@@ -4,8 +4,6 @@
     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     Adds whoosh indexing capabilities to SQLAlchemy models for Flask applications
-    ** Alpha **
-
     :copyright: (c) 2012 by Karl Gyllstrom
     :license: BSD (see LICENSE.txt)
 
@@ -16,6 +14,8 @@ from flaskext.sqlalchemy import models_committed
 import sqlalchemy
 
 from whoosh.qparser import MultifieldParser
+from whoosh import index
+from whoosh.analysis import StemmingAnalyzer
 import whoosh
 from whoosh.fields import Schema, TEXT, KEYWORD, ID, STORED
 
@@ -80,9 +80,7 @@ def _get_attributes(model, as_schema, get_primary=False):
             elif x in model.__class__.__searchable__:
                 if type(y.property.columns[0].type) == sqlalchemy.types.Text:
                     if as_schema:
-                        values[x] = whoosh.fields.TEXT(
-                                analyzer=whoosh.analysis.StemmingAnalyzer())
-
+                        values[x] = whoosh.fields.TEXT(analyzer=StemmingAnalyzer())
                     else:
                         values[x] = getattr(model, x)
 
