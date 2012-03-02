@@ -3,16 +3,18 @@ Flask-WhooshAlchemy extension
 
 ALPHA but actively developed.
 
-Supports the easy indexing of SQLAlchemy model fields.
+Supports the easy text-indexing of SQLAlchemy model fields.
 
 BSD license
 
 Quick start example
 -----
 
->>> import whooshalchemy
+>>> import flask_whooshalchemy
 >>>
->>> class MyModel(db.Model):  # must first initialize db = SQLAlchemy(app), see flask-sqlalchemy
+>>> db = SQLAlchemy(app)  # see flask-sqlalchemy
+>>>
+>>> class MyModel(db.Model):
 ...   __tablename__ = 'mymodel'
 ...   __searchable__ = ['title', 'body']  # these fields will be indexed by whoosh
 ...
@@ -24,7 +26,7 @@ Quick start example
 ...   def __repr__(self):
 ...       return '{0}(title={1})'.format(self.__class__.__name__, self.title)
 ...
->>> app.config['WHOOSH_INDEX'] = 'path/to/whoosh/base'
+>>> app.config['WHOOSH_BASE'] = 'path/to/whoosh/base'
 >>> m = MyModel(title='My cool title', content='This is the first post.')
 >>> db.session.add(m); db.session.commit()
 >>>

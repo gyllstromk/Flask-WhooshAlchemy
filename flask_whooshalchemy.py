@@ -9,6 +9,9 @@
 
 '''
 
+from __future__ import absolute_import
+
+
 from flaskext.sqlalchemy import models_committed
 
 import sqlalchemy
@@ -45,10 +48,10 @@ def whoosh_index(app, model):
 
     indx = app.whoosh_indexes.get(model.__class__.__name__)
     if indx is None:
-        if not app.config.get('WHOOSH_INDEX'):
-            app.config['WHOOSH_INDEX'] = './whoosh_index2'
+        if not app.config.get('WHOOSH_BASE'):
+            app.config['WHOOSH_BASE'] = './whoosh_index'
 
-        wi = os.path.join(app.config.get('WHOOSH_INDEX'), model.__class__.__name__)
+        wi = os.path.join(app.config.get('WHOOSH_BASE'), model.__class__.__name__)
 
         if whoosh.index.exists_in(wi):
             indx = whoosh.index.open_dir(wi)

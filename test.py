@@ -1,8 +1,10 @@
+from __future__ import absolute_import
+
 from flask import Flask
 from flaskext.sqlalchemy import SQLAlchemy
 from flaskext.testing import Twill, TestCase
 
-import whooshalchemy
+import flask_whooshalchemy
 
 import os
 import tempfile
@@ -19,7 +21,7 @@ class Tests(TestCase):
         app = Flask(__name__)
         app.config.update(config)
 
-        app.config['WHOOSH_INDEX'] = os.path.join(tmp_dir, 'whoosh')
+        app.config['WHOOSH_BASE'] = os.path.join(tmp_dir, 'whoosh')
 
         app.db = SQLAlchemy(app)
 
@@ -40,7 +42,7 @@ class Tests(TestCase):
 
     def tearDown(self):
         try:
-            shutil.rmtree(self.app.config['WHOOSH_INDEX'])
+            shutil.rmtree(self.app.config['WHOOSH_BASE'])
         except OSError, e:
             if e.errno != 2: # code 2 - no such file or directory
                 raise
