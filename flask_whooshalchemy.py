@@ -26,11 +26,14 @@ import os
 
 
 class Searcher(object):
-    def __init__(self, model, indx):
+    ''' Assigned to a Model class as ``search_query``, which enables
+    text-querying. '''
+
+    def __init__(self, model, primary, indx):
         self.model = model
-        self.primary = _get_attributes(model, False, True)
-        self.searcher = indx.searcher()
+        self.primary = primary
         self.index = indx
+        self.searcher = indx.searcher()
         fields = set(indx.schema._fields.keys()) - set([self.primary])
         self.parser = MultifieldParser(list(fields), indx.schema)
 
@@ -53,47 +56,46 @@ def whoosh_index(app, model):
 
         wi = os.path.join(app.config.get('WHOOSH_BASE'), model.__class__.__name__)
 
+        schema, primary =_get_schema_and_primary(model)
+
         if whoosh.index.exists_in(wi):
             indx = whoosh.index.open_dir(wi)
         else:
             if not os.path.exists(wi):
                 os.makedirs(wi)
-            indx = whoosh.index.create_in(wi, _get_attributes(model, True))
+            indx = whoosh.index.create_in(wi, schema)
 
         app.whoosh_indexes[model.__class__.__name__] = indx
-        model.__class__.search_query = Searcher(model, indx)
+        model.__class__.search_query = Searcher(model, primary, indx)
     return indx
 
 
-def _get_attributes(model, as_schema, get_primary=False):
-    # http://stackoverflow.com/questions/9398664/how-can-i-dynamically-get-a-list-of-primary-key-attributes-from-an-sqlalchemy-cl
+def _get_schema_and_primary(model):
     import inspect
     predicate = lambda x: isinstance(x, sqlalchemy.orm.attributes.InstrumentedAttribute)
     fields = inspect.getmembers(model.__class__, predicate=predicate)
-    values = {}
+    schema = {}
+    primary = None
     for x, y in fields:
         if hasattr(y.property, 'columns'):
             if y.property.columns[0].primary_key:
-                if get_primary:
-                    return x
-                if as_schema:
-                    values[x] = whoosh.fields.ID(stored=True, unique=True)
-                else:
-                    values[x] = unicode(getattr(model, x))
+                schema[x] = whoosh.fields.ID(stored=True, unique=True)
+                primary = x
             elif x in model.__class__.__searchable__:
                 if type(y.property.columns[0].type) == sqlalchemy.types.Text:
-                    if as_schema:
-                        values[x] = whoosh.fields.TEXT(analyzer=StemmingAnalyzer())
-                    else:
-                        values[x] = getattr(model, x)
+                    schema[x] = whoosh.fields.TEXT(analyzer=StemmingAnalyzer())
 
-    if as_schema:
-        return Schema(**values)
-    return values
+    return Schema(**schema), primary
 
 
 def after_flush(app, changes):
-    bytype = {}
+    ''' Any db updates go through here. We check if any of these models have
+    ``__searchable__`` fields, indicating they need to be indexed. With these
+    we update the whoosh index for the model. If no index exists, it will be
+    created here; this could impose a penalty on the initial commit of a model.
+    '''
+
+    bytype = {}  # sort changes by type so we can use per-model writer
     for change in changes:
         update = change[1] in ('update', 'insert')
 
@@ -103,12 +105,15 @@ def after_flush(app, changes):
     for typ, values in bytype.iteritems():
         index = whoosh_index(app, values[0][1])
         with index.writer() as writer:
-            primary_field = _get_attributes(values[0][1], False, True)
+            primary_field = values[0][1].search_query.primary
+            searchable = values[0][1].__searchable__
+
             for update, v in values:
                 writer.delete_by_term(primary_field, unicode(getattr(v, primary_field)))
 
                 if update:
-                    attrs = _get_attributes(v, False)
+                    attrs = dict((key, getattr(v, key)) for key in searchable)
+                    attrs[primary_field] = unicode(getattr(v, primary_field))
                     writer.add_document(**attrs)
 
 
