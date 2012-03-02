@@ -37,5 +37,5 @@ Quick start example
 >>>
 >>> # Note: the response is a :class:`BaseQuery` object, so you can append other SQL operations:
 >>>
->>> two_days_ago = datetime.date.now() - datetime.timedelta(2)
+>>> two_days_ago = datetime.date.today() - datetime.timedelta(2)
 >>> recent_matches = BlogPost.search_query('first').filter(BlogPost.created >= two_days_ago)
