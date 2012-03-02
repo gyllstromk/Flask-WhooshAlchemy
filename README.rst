@@ -30,7 +30,12 @@ Quick start example
 >>> m = BlogPost(title='My cool title', content='This is the first post.')
 >>> db.session.add(m); db.session.commit()
 >>>
->>> print BlogPost.search_query('cool')
+>>> print list(BlogPost.search_query('cool'))
 ... [BlogPost(title='My cool title')]
->>> print BlogPost.search_query('first')
+>>> print list(BlogPost.search_query('first'))
 ... [BlogPost(title='My cool title')]
+>>>
+>>> # Note: the response is a :class:`BaseQuery` object, so you can append other SQL operations:
+>>>
+>>> two_days_ago = datetime.date.now() - datetime.timedelta(2)
+>>> recent_matches = BlogPost.search_query('first').filter(BlogPost.created >= two_days_ago)

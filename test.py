@@ -6,6 +6,7 @@ from flaskext.testing import Twill, TestCase
 
 import flask_whooshalchemy
 
+import datetime
 import os
 import tempfile
 import shutil
@@ -31,6 +32,7 @@ class Tests(TestCase):
 
             id = app.db.Column(app.db.Integer, primary_key=True)
             title = app.db.Column(app.db.Text)
+            created = app.db.Column(app.db.DateTime(), default=datetime.datetime.utcnow())
 
             def __repr__(self):
                 return '{0}(title={1})'.format(self.__class__.__name__, self.title)
@@ -76,6 +78,18 @@ class Tests(TestCase):
         res = list(self.ObjectA.search_query(u'good'))
         self.assertEqual(len(res), 1)
         self.assertEqual(res[0].id, b.id)
+
+        a = self.ObjectA(title=u'good old post', created=datetime.date.today() - datetime.timedelta(2))
+        self.app.db.session.add(a)
+        self.app.db.session.commit()
+        res = list(self.ObjectA.search_query(u'good'))
+        self.assertEqual(len(res), 2)
+        recent = list(self.ObjectA.search_query(u'good').filter(self.ObjectA.created >= datetime.date.today() - datetime.timedelta(1)))
+        self.assertEqual(len(recent), 1)
+        self.assertEqual(recent[0].title, b.title)
+        old = list(self.ObjectA.search_query(u'good').filter(self.ObjectA.created <= datetime.date.today() - datetime.timedelta(1)))
+        self.assertEqual(len(old), 1)
+        self.assertEqual(old[0].title, a.title)
 #
 #        with Twill(self.app, port=5000) as t:
 #            t.browser.go(t.url('/'))
