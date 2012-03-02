@@ -9,7 +9,7 @@ from setuptools import setup
 
 setup(
     name='Flask-WhooshAlchemy',
-    version='0.1a',
+    version='0.2a',
     url='https://github.com/gyllstromk/Flask-WhooshAlchemy',
     license='BSD',
     author='Karl Gyllstrom',
@@ -24,7 +24,7 @@ setup(
     include_package_data=True,
     platforms='any',
     install_requires=[
-        'Flask', 'Flask-SQLAlchemy', 'whoosh'
+        'Flask', 'Flask-SQLAlchemy', 'whoosh', 'blinker'
     ],
     classifiers=[
         #'Environment :: Web Environment',
@@ -34,5 +34,7 @@ setup(
         #'Programming Language :: Python',
         #'Topic :: Internet :: WWW/HTTP :: Dynamic Content',
         #'Topic :: Software Development :: Libraries :: Python Modules'
-    ]
+    ],
+    test_suite = 'test.test_all',
+
 )

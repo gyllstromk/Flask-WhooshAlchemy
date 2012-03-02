@@ -3,8 +3,7 @@ from __future__ import absolute_import
 from flask import Flask
 from flaskext.sqlalchemy import SQLAlchemy
 from flaskext.testing import Twill, TestCase
-
-import flask_whooshalchemy
+import flask.ext.whooshalchemy
 
 import datetime
 import os
@@ -96,6 +95,10 @@ class Tests(TestCase):
 #            t.browser.show()
 
 
-if __name__ == '__main__':
+def test_all():
     import unittest
     unittest.main()
+
+
+if __name__ == '__main__':
+    test_all()
