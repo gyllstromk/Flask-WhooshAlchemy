@@ -106,6 +106,10 @@ def after_flush(app, changes):
             searchable = values[0][1].__searchable__
 
             for update, v in values:
+                # delete everything. stuff that's updated or inserted will get
+                # added as a new doc. Could probably replace this with a whoosh
+                # update.
+
                 writer.delete_by_term(primary_field, unicode(getattr(v, primary_field)))
 
                 if update:
