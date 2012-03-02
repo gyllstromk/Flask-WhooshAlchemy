@@ -56,7 +56,7 @@ def whoosh_index(app, model):
 
         wi = os.path.join(app.config.get('WHOOSH_BASE'), model.__class__.__name__)
 
-        schema, primary =_get_schema_and_primary(model)
+        schema, primary = _get_schema_and_primary(model)
 
         if whoosh.index.exists_in(wi):
             indx = whoosh.index.open_dir(wi)
@@ -71,19 +71,16 @@ def whoosh_index(app, model):
 
 
 def _get_schema_and_primary(model):
-    import inspect
-    predicate = lambda x: isinstance(x, sqlalchemy.orm.attributes.InstrumentedAttribute)
-    fields = inspect.getmembers(model.__class__, predicate=predicate)
     schema = {}
     primary = None
-    for x, y in fields:
-        if hasattr(y.property, 'columns'):
-            if y.property.columns[0].primary_key:
-                schema[x] = whoosh.fields.ID(stored=True, unique=True)
-                primary = x
-            elif x in model.__class__.__searchable__:
-                if type(y.property.columns[0].type) == sqlalchemy.types.Text:
-                    schema[x] = whoosh.fields.TEXT(analyzer=StemmingAnalyzer())
+    for field in model.__table__.columns:
+        if field.primary_key:
+            schema[field.name] = whoosh.fields.ID(stored=True, unique=True)
+            primary = field.name
+        if field.name in model.__searchable__:
+            if type(field.type) == sqlalchemy.types.Text:
+                schema[field.name] = whoosh.fields.TEXT(analyzer=StemmingAnalyzer())
+
 
     return Schema(**schema), primary
 
