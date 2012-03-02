@@ -46,17 +46,30 @@ class Searcher(object):
 
 
 def whoosh_index(app, model):
+    # gets the whoosh index for this model, creating one if it does not exist.
+    # in creating one, a schema is created based on the fields of the model.
+    # Currently we only support primary key -> whoosh.ID, and sqlalchemy.TEXT
+    # -> whoosh.TEXT, but can add more later. A dict of model -> whoosh index
+    # is added to the ``app`` variable.
+
     if not hasattr(app, 'whoosh_indexes'):
         app.whoosh_indexes = {}
 
     indx = app.whoosh_indexes.get(model.__class__.__name__)
+
     if indx is None:
         if not app.config.get('WHOOSH_BASE'):
+            # XXX todo: is there a better approach to handle the absense of a
+            # config value for whoosh base? Should we throw an exception? If
+            # so, this exception will be thrown in the after_commit function,
+            # which is probably not ideal.
+
             app.config['WHOOSH_BASE'] = './whoosh_index'
 
+        # we index per model.
         wi = os.path.join(app.config.get('WHOOSH_BASE'), model.__class__.__name__)
 
-        schema, primary = _get_schema_and_primary(model)
+        schema, primary = _get_whoosh_schema_and_primary(model)
 
         if whoosh.index.exists_in(wi):
             indx = whoosh.index.open_dir(wi)
@@ -67,10 +80,11 @@ def whoosh_index(app, model):
 
         app.whoosh_indexes[model.__class__.__name__] = indx
         model.__class__.search_query = Searcher(model, primary, indx)
+
     return indx
 
 
-def _get_schema_and_primary(model):
+def _get_whoosh_schema_and_primary(model):
     schema = {}
     primary = None
     for field in model.__table__.columns:
