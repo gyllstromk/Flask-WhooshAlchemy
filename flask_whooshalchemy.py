@@ -12,7 +12,7 @@
 from __future__ import absolute_import
 
 
-from flaskext.sqlalchemy import models_committed
+from flask_sqlalchemy import models_committed
 
 import sqlalchemy
 
@@ -23,6 +23,11 @@ import whoosh
 from whoosh.fields import Schema, TEXT, KEYWORD, ID, STORED
 
 import os
+
+
+def EmptyQuery(model):
+    # XXX is this efficient?
+    return model.__class__.query.filter('null')
 
 
 class Searcher(object):
@@ -40,6 +45,9 @@ class Searcher(object):
     def __call__(self, query, limit=None):
         results = [x[self.primary] for x in
                 self.index.searcher().search(self.parser.parse(query), limit=limit)]
+
+        if len(results) == 0:
+            return EmptyQuery(self.model)
 
         return self.model.__class__.query.filter(getattr(self.model.__class__,
             self.primary).in_(results))
@@ -120,16 +128,12 @@ def after_flush(app, changes):
             searchable = values[0][1].__searchable__
 
             for update, v in values:
-                # delete everything. stuff that's updated or inserted will get
-                # added as a new doc. Could probably replace this with a whoosh
-                # update.
-
-                writer.delete_by_term(primary_field, unicode(getattr(v, primary_field)))
-
                 if update:
                     attrs = dict((key, getattr(v, key)) for key in searchable)
                     attrs[primary_field] = unicode(getattr(v, primary_field))
-                    writer.add_document(**attrs)
+                    writer.update_document(**attrs)
+                else:
+                    writer.delete_by_term(primary_field, unicode(getattr(v, primary_field)))
 
 
 models_committed.connect(after_flush)
