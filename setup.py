@@ -9,7 +9,7 @@ from setuptools import setup
 
 setup(
     name='Flask-WhooshAlchemy',
-    version='0.2a',
+    version='0.3a',
     url='https://github.com/gyllstromk/Flask-WhooshAlchemy',
     license='BSD',
     author='Karl Gyllstrom',
