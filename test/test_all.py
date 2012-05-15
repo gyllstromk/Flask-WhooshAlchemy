@@ -2,7 +2,7 @@ from __future__ import absolute_import
 
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
-from flaskext.testing import Twill, TestCase
+from flaskext.testing import TestCase
 import flask_whooshalchemy
 
 import datetime
@@ -89,10 +89,6 @@ class Tests(TestCase):
         old = list(self.ObjectA.search_query(u'good').filter(self.ObjectA.created <= datetime.date.today() - datetime.timedelta(1)))
         self.assertEqual(len(old), 1)
         self.assertEqual(old[0].title, a.title)
-#
-#        with Twill(self.app, port=5000) as t:
-#            t.browser.go(t.url('/'))
-#            t.browser.show()
 
 
 if __name__ == '__main__':

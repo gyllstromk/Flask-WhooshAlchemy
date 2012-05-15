@@ -3,7 +3,9 @@
     whooshalchemy flask extension
     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    Adds whoosh indexing capabilities to SQLAlchemy models for Flask applications
+    Adds whoosh indexing capabilities to SQLAlchemy models for Flask
+    applications.
+
     :copyright: (c) 2012 by Karl Gyllstrom
     :license: BSD (see LICENSE.txt)
 
@@ -17,15 +19,17 @@ from flask_sqlalchemy import models_committed
 import sqlalchemy
 
 from whoosh.qparser import MultifieldParser
-from whoosh import index
 from whoosh.analysis import StemmingAnalyzer
-import whoosh
-from whoosh.fields import Schema, TEXT, KEYWORD, ID, STORED
+import whoosh.index
+from whoosh.fields import Schema
+#from whoosh.fields import ID, TEXT, KEYWORD, STORED
 
 import os
 
 
 def EmptyQuery(model):
+    ''' Used to return empty set when whoosh-search results return nothing. '''
+
     # XXX is this efficient?
     return model.__class__.query.filter('null')
 
@@ -44,7 +48,8 @@ class Searcher(object):
 
     def __call__(self, query, limit=None):
         results = [x[self.primary] for x in
-                self.index.searcher().search(self.parser.parse(query), limit=limit)]
+                self.index.searcher().search(self.parser.parse(query),
+                    limit=limit)]
 
         if len(results) == 0:
             return EmptyQuery(self.model)
@@ -75,7 +80,8 @@ def whoosh_index(app, model):
             app.config['WHOOSH_BASE'] = './whoosh_index'
 
         # we index per model.
-        wi = os.path.join(app.config.get('WHOOSH_BASE'), model.__class__.__name__)
+        wi = os.path.join(app.config.get('WHOOSH_BASE'),
+                model.__class__.__name__)
 
         schema, primary = _get_whoosh_schema_and_primary(model)
 
@@ -101,8 +107,8 @@ def _get_whoosh_schema_and_primary(model):
             primary = field.name
         if field.name in model.__searchable__:
             if type(field.type) == sqlalchemy.types.Text:
-                schema[field.name] = whoosh.fields.TEXT(analyzer=StemmingAnalyzer())
-
+                schema[field.name] = whoosh.fields.TEXT(
+                        analyzer=StemmingAnalyzer())
 
     return Schema(**schema), primary
 
@@ -119,9 +125,10 @@ def after_flush(app, changes):
         update = change[1] in ('update', 'insert')
 
         if hasattr(change[0].__class__, '__searchable__'):
-            bytype.setdefault(change[0].__class__.__name__, []).append((update, change[0]))
+            bytype.setdefault(change[0].__class__.__name__, []).append((update,
+                change[0]))
 
-    for typ, values in bytype.iteritems():
+    for values in bytype.itervalues():
         index = whoosh_index(app, values[0][1])
         with index.writer() as writer:
             primary_field = values[0][1].search_query.primary
@@ -133,7 +140,8 @@ def after_flush(app, changes):
                     attrs[primary_field] = unicode(getattr(v, primary_field))
                     writer.update_document(**attrs)
                 else:
-                    writer.delete_by_term(primary_field, unicode(getattr(v, primary_field)))
+                    writer.delete_by_term(primary_field, unicode(getattr(v,
+                        primary_field)))
 
 
 models_committed.connect(after_flush)
