@@ -1,9 +1,9 @@
 from __future__ import absolute_import
 
 from flask import Flask
-from flaskext.sqlalchemy import SQLAlchemy
+from flask_sqlalchemy import SQLAlchemy
 from flaskext.testing import Twill, TestCase
-import flask.ext.whooshalchemy
+import flask_whooshalchemy
 
 import datetime
 import os
@@ -44,7 +44,7 @@ class Tests(TestCase):
     def tearDown(self):
         try:
             shutil.rmtree(self.app.config['WHOOSH_BASE'])
-        except OSError, e:
+        except OSError as e:
             if e.errno != 2: # code 2 - no such file or directory
                 raise
 
@@ -95,10 +95,6 @@ class Tests(TestCase):
 #            t.browser.show()
 
 
-def test_all():
+if __name__ == '__main__':
     import unittest
     unittest.main()
-
-
-if __name__ == '__main__':
-    test_all()
