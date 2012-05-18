@@ -3,6 +3,8 @@ Welcome to Flask-WhooshAlchemy!
 
 Flask-WhooshAlchemy integrates the text-search functionality of `Whoosh <https://bitbucket.org/mchaput/whoosh/wiki/Home>`_ with the ORM of `SQLAlchemy <http://www.sqlalchemy.org/>`_ for use in `Flask <http://flask.pocoo.org/>`_ applications.
 
+Source code and issue tracking at `GitHub <http://github.com/gyllstromk/Flask-WhooshAlchemy>`_.
+
 Install
 -------
 
