@@ -70,6 +70,24 @@ class _QueryProxy(sqlalchemy.orm.Query):
         return _inner()
 
     def whoosh_search(self, query, limit=None, fields=None, or_=False):
+        '''
+        
+        Execute text query on database. Results have a text-based
+        match to the query, ranked by the scores from the underlying Whoosh index.
+
+        By default, the search is executed on all of the indexed fields as an
+        OR conjunction. For example, if a model has 'title' and 'content'
+        indicated as ``__searchable__``, a query will be checked against both
+        fields, returning any instance whose title or content are a content
+        match for the query. To specify particular fields to be checked,
+        populate the ``fields`` parameter with the desired fields.
+
+        By default, results will only be returned if they contain all of the
+        query terms (AND). To switch to an OR grouping, set the ``or_``
+        parameter to ``True``.
+
+        '''
+
         results = self._ws(query, limit, fields, or_)
 
         if len(results) == 0:
@@ -93,7 +111,7 @@ class _QueryProxy(sqlalchemy.orm.Query):
 
 class _Searcher(object):
     ''' Assigned to a Model class as ``pure_search``, which enables
-    text-querying to whoosh hit list. '''
+    text-querying to whoosh hit list. Also used by ``query.whoosh_search``'''
 
     def __init__(self, primary, indx):
         self.primary_key_name = primary
@@ -131,7 +149,7 @@ def _whoosh_index(app, model):
             # so, this exception will be thrown in the after_commit function,
             # which is probably not ideal.
 
-            app.config['WHOOSH_BASE'] = './whoosh_index'
+            app.config['WHOOSH_BASE'] = 'whoosh_index'
 
         # we index per model.
         wi = os.path.join(app.config.get('WHOOSH_BASE'),

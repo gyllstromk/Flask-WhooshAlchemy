@@ -1,3 +1,16 @@
+'''
+
+    whooshalchemy flask extension
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    Adds whoosh indexing capabilities to SQLAlchemy models for Flask
+    applications.
+
+    :copyright: (c) 2012 by Karl Gyllstrom
+    :license: BSD (see LICENSE.txt)
+
+'''
+
 from __future__ import absolute_import
 
 from flask import Flask
