@@ -47,14 +47,19 @@ class _QueryProxy(sqlalchemy.orm.Query):
     def __iter__(self):
         ''' Reorder ORM-db results according to Whoosh relevance score. '''
 
+        super_iter = super(_QueryProxy, self).__iter__()
         if self._whoosh_rank is None:
-            return super(_QueryProxy, self).__iter__()
+            # Whoosh search hasn't been run so behave as normal.
 
+            return super_iter
+
+        # Iterate through the values and re-order by whoosh relevance.
         ordered_by_whoosh_rank = []
 
-        for row in super(_QueryProxy, self).__iter__():
+        for row in super_iter:
             heapq.heappush(ordered_by_whoosh_rank,
-                (self._whoosh_rank[unicode(getattr(row, self._primary_key_name))], row))
+                (self._whoosh_rank[unicode(getattr(row,
+                    self._primary_key_name))], row))
 
         def _inner():
             while ordered_by_whoosh_rank:
@@ -78,7 +83,9 @@ class _QueryProxy(sqlalchemy.orm.Query):
 
         f = self.filter(getattr(self.model.__class__,
             self._primary_key_name).in_(result_set))
+
         f._whoosh_rank = result_ranks
+
         return f
 
 
