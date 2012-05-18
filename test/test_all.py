@@ -24,48 +24,53 @@ import tempfile
 import shutil
 
 
+db = SQLAlchemy()
+
+
+class BlogishBlob(object):
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.Text)
+    content = db.Column(db.String)
+    blurb = db.Column(db.Unicode)
+    ignored = db.Column(db.Unicode)
+    created = db.Column(db.DateTime(), default=datetime.datetime.utcnow())
+
+    def __repr__(self):
+        return '{0}(title={1})'.format(self.__class__.__name__, self.title)
+
+
+class ObjectA(db.Model, BlogishBlob):
+    __tablename__ = 'objectA'
+    __searchable__ = ['title', 'content', 'blurb']
+
+
+class ObjectB(db.Model, BlogishBlob):
+    __tablename__ = 'objectB'
+    __searchable__ = ['title', 'content', 'content'] # dup intentional
+
+
+class ObjectC(db.Model, BlogishBlob):
+    __tablename__ = 'objectC'
+    __searchable__ = ['title', 'field_that_doesnt_exist']
+
+
+
 class Tests(TestCase):
+    DATABASE_URL='sqlite://'
+    TESTING=True
+
     def create_app(self):
         tmp_dir = tempfile.mkdtemp()
 
-        config = dict(DATABASE_URL='sqlite://',
-                      TESTING=True)
-
         app = Flask(__name__)
-        app.config.update(config)
 
         app.config['WHOOSH_BASE'] = os.path.join(tmp_dir, 'whoosh')
 
-        app.db = SQLAlchemy(app)
-
-        class BlogishBlob(object):
-            __searchable__ = ['title', 'content']
-
-            id = app.db.Column(app.db.Integer, primary_key=True)
-            title = app.db.Column(app.db.Text)
-            content = app.db.Column(app.db.String)
-            ignored = app.db.Column(app.db.Text)
-            created = app.db.Column(app.db.DateTime(), default=datetime.datetime.utcnow())
-
-            def __repr__(self):
-                return '{0}(title={1})'.format(self.__class__.__name__, self.title)
-
-
-        class ObjectA(app.db.Model, BlogishBlob):
-            __tablename__ = 'objectA'
-            __searchable__ = ['title', 'content']
-
-
-        class ObjectB(app.db.Model, BlogishBlob):
-            __tablename__ = 'objectB'
-            __searchable__ = ['title', 'content']
-
-        self.ObjectA = ObjectA
-        self.ObjectB = ObjectB
-
-        app.db.create_all()
-
         return app
+
+    def setUp(self):
+        db.init_app(self.app)
+        db.create_all()
 
     def tearDown(self):
         try:
@@ -74,35 +79,53 @@ class Tests(TestCase):
             if e.errno != 2: # code 2 - no such file or directory
                 raise
 
-    def test_single_field(self):
+        db.session.remove()
+        db.drop_all()
+
+    def test_all(self):
         title1 = u'a slightly long title'
         title2 = u'another title'
         title3 = u'wow another title'
 
-        self.app.db.session.add(self.ObjectA(title=title1, content=u'hello world'))
-        self.app.db.session.commit()
+        obj = ObjectA(title=u'title', blurb='this is a blurb')
+        db.session.add(obj)
+        db.session.commit()
 
-        self.assertEqual(len(list(self.ObjectA.query.whoosh_search(u'what'))), 0)
-        self.assertEqual(len(list(self.ObjectA.query.whoosh_search(u'title'))), 1)
-        self.assertEqual(len(list(self.ObjectA.query.whoosh_search(u'hello'))), 1)
+        self.assertEqual(len(list(ObjectA.query.whoosh_search('blurb'))), 1)
+        db.session.delete(obj)
+        db.session.commit()
 
-        self.app.db.session.add(self.ObjectB(title=u'my title', content=u'hello world'))
-        self.app.db.session.commit()
+        db.session.add(ObjectA(title=title1, content=u'hello world', ignored=u'no match'))
+        db.session.commit()
+
+        self.assertEqual(len(list(ObjectA.query.whoosh_search('what'))), 0)
+        self.assertEqual(len(list(ObjectA.query.whoosh_search(u'no match'))), 0)
+        self.assertEqual(len(list(ObjectA.query.whoosh_search(u'title'))), 1)
+        self.assertEqual(len(list(ObjectA.query.whoosh_search(u'hello'))), 1)
+
+        db.session.add(ObjectB(title=u'my title', content=u'hello world'))
+        db.session.commit()
+
+        db.session.add(ObjectC(title=u'my title', content=u'hello world'))
+        self.assertRaises(AttributeError, db.session.commit)
+        db.session.rollback()
+
 
         # make sure does not interfere with ObjectA's results
-        self.assertEqual(len(list(self.ObjectA.query.whoosh_search(u'what'))), 0)
-        self.assertEqual(len(list(self.ObjectA.query.whoosh_search(u'title'))), 1)
-        self.assertEqual(len(list(self.ObjectA.query.whoosh_search(u'hello'))), 1)
+        self.assertEqual(len(list(ObjectA.query.whoosh_search(u'what'))), 0)
+        self.assertEqual(len(list(ObjectA.query.whoosh_search(u'title'))), 1)
+        self.assertEqual(len(list(ObjectA.query.whoosh_search(u'hello'))), 1)
 
-        self.assertEqual(len(list(self.ObjectB.query.whoosh_search(u'what'))), 0)
-        self.assertEqual(len(list(self.ObjectB.query.whoosh_search(u'title'))), 1)
-        self.assertEqual(len(list(self.ObjectB.query.whoosh_search(u'hello'))), 1)
+        self.assertEqual(len(list(ObjectB.query.whoosh_search(u'what'))), 0)
+        self.assertEqual(len(list(ObjectB.query.whoosh_search(u'title'))), 1)
+        self.assertEqual(len(list(ObjectB.query.whoosh_search(u'hello'))), 1)
 
-        self.app.db.session.add(self.ObjectA(title=title2, content=u'a different message'))
-        self.app.db.session.commit()
+        obj2 = ObjectA(title=title2, content=u'a different message')
+        db.session.add(obj2)
+        db.session.commit()
 
-        self.assertEqual(len(list(self.ObjectA.query.whoosh_search(u'what'))), 0)
-        l = list(self.ObjectA.query.whoosh_search(u'title'))
+        self.assertEqual(len(list(ObjectA.query.whoosh_search(u'what'))), 0)
+        l = list(ObjectA.query.whoosh_search(u'title'))
         self.assertEqual(len(l), 2)
 
         # ranking should always be as follows, since title2 should have a higher relevance score
@@ -110,27 +133,27 @@ class Tests(TestCase):
         self.assertEqual(l[0].title, title2)
         self.assertEqual(l[1].title, title1)
 
-        self.assertEqual(len(list(self.ObjectA.query.whoosh_search(u'hello'))), 1)
-        self.assertEqual(len(list(self.ObjectA.query.whoosh_search(u'message'))), 1)
+        self.assertEqual(len(list(ObjectA.query.whoosh_search(u'hello'))), 1)
+        self.assertEqual(len(list(ObjectA.query.whoosh_search(u'message'))), 1)
 
-        self.assertEqual(len(list(self.ObjectB.query.whoosh_search(u'what'))), 0)
-        self.assertEqual(len(list(self.ObjectB.query.whoosh_search(u'title'))), 1)
-        self.assertEqual(len(list(self.ObjectB.query.whoosh_search(u'hello'))), 1)
-        self.assertEqual(len(list(self.ObjectB.query.whoosh_search(u'message'))), 0)
+        self.assertEqual(len(list(ObjectB.query.whoosh_search(u'what'))), 0)
+        self.assertEqual(len(list(ObjectB.query.whoosh_search(u'title'))), 1)
+        self.assertEqual(len(list(ObjectB.query.whoosh_search(u'hello'))), 1)
+        self.assertEqual(len(list(ObjectB.query.whoosh_search(u'message'))), 0)
 
-        self.app.db.session.add(self.ObjectA(title=title3, content=u'a different message'))
-        self.app.db.session.commit()
+        db.session.add(ObjectA(title=title3, content=u'a different message'))
+        db.session.commit()
 
-        l = list(self.ObjectA.query.whoosh_search(u'title'))
+        l = list(ObjectA.query.whoosh_search(u'title'))
         self.assertEqual(len(l), 3)
         self.assertEqual(l[0].title, title2)
         self.assertEqual(l[1].title, title3)
         self.assertEqual(l[2].title, title1)
 
-        self.app.db.session.delete(self.ObjectA.query.get(2))
-        self.app.db.session.commit()
+        db.session.delete(obj2)
+        db.session.commit()
 
-        l = list(self.ObjectA.query.whoosh_search(u'title'))
+        l = list(ObjectA.query.whoosh_search(u'title'))
         self.assertEqual(len(l), 2)
         self.assertEqual(l[0].title, title3)
         self.assertEqual(l[1].title, title1)
@@ -139,13 +162,13 @@ class Tests(TestCase):
 
         title4 = u'a title that is significantly longer than the others'
 
-        self.app.db.session.add(self.ObjectA(title=title4, created=two_days_ago))
-        self.app.db.session.commit()
+        db.session.add(ObjectA(title=title4, created=two_days_ago))
+        db.session.commit()
 
         one_day_ago = datetime.date.today() - datetime.timedelta(1)
 
-        recent = list(self.ObjectA.query.whoosh_search(u'title')
-                .filter(self.ObjectA.created >= one_day_ago))
+        recent = list(ObjectA.query.whoosh_search(u'title')
+                .filter(ObjectA.created >= one_day_ago))
 
         self.assertEqual(len(recent), 2)
         self.assertEqual(l[0].title, title3)
@@ -153,8 +176,8 @@ class Tests(TestCase):
 
         three_days_ago = datetime.date.today() - datetime.timedelta(3)
 
-        l = list(self.ObjectA.query.whoosh_search(u'title')
-                .filter(self.ObjectA.created >= three_days_ago))
+        l = list(ObjectA.query.whoosh_search(u'title')
+                .filter(ObjectA.created >= three_days_ago))
 
         self.assertEqual(len(l), 3)
         self.assertEqual(l[0].title, title3)
@@ -163,10 +186,10 @@ class Tests(TestCase):
 
         title5 = u'title with title as frequent title word'
 
-        self.app.db.session.add(self.ObjectA(title=title5))
-        self.app.db.session.commit()
+        db.session.add(ObjectA(title=title5))
+        db.session.commit()
 
-        l = list(self.ObjectA.query.whoosh_search(u'title'))
+        l = list(ObjectA.query.whoosh_search(u'title'))
         self.assertEqual(len(l), 4)
         self.assertEqual(l[0].title, title5)
         self.assertEqual(l[1].title, title3)
@@ -174,55 +197,64 @@ class Tests(TestCase):
         self.assertEqual(l[3].title, title4)
 
         # test limit
-        l = list(self.ObjectA.query.whoosh_search(u'title', limit=2))
+        l = list(ObjectA.query.whoosh_search(u'title', limit=2))
         self.assertEqual(len(l), 2)
         self.assertEqual(l[0].title, title5)
         self.assertEqual(l[1].title, title3)
 
-    def test_multi_field(self):
+        # XXX should replace this with a new function, but I can't figure out
+        # how to do this cleanly with flask sqlalchemy and testing
+
+        db.drop_all()
+        db.create_all()
+
         title1 = u'my title'
-        self.app.db.session.add(self.ObjectA(title=title1, content=u'hello world'))
-        self.app.db.session.commit()
+        db.session.add(ObjectA(title=title1, content=u'hello world'))
+        db.session.commit()
 
-        l = list(self.ObjectA.query.whoosh_search(u'title'))
+        l = list(ObjectA.query.whoosh_search(u'title'))
         self.assertEqual(len(l), 1)
 
-        l = list(self.ObjectA.query.whoosh_search(u'hello'))
+        l = list(ObjectA.query.whoosh_search(u'hello'))
         self.assertEqual(len(l), 1)
 
-        l = list(self.ObjectA.query.whoosh_search(u'title', fields=('title',)))
+        l = list(ObjectA.query.whoosh_search(u'title', fields=('title',)))
         self.assertEqual(len(l), 1)
-        l = list(self.ObjectA.query.whoosh_search(u'hello', fields=('title',)))
+        l = list(ObjectA.query.whoosh_search(u'hello', fields=('title',)))
         self.assertEqual(len(l), 0)
 
-        l = list(self.ObjectA.query.whoosh_search(u'title', fields=('content',)))
+        l = list(ObjectA.query.whoosh_search(u'title', fields=('content',)))
         self.assertEqual(len(l), 0)
-        l = list(self.ObjectA.query.whoosh_search(u'hello', fields=('content',)))
+        l = list(ObjectA.query.whoosh_search(u'hello', fields=('content',)))
         self.assertEqual(len(l), 1)
 
-        l = list(self.ObjectA.query.whoosh_search(u'hello dude', fields=('content',), or_=True))
+        l = list(ObjectA.query.whoosh_search(u'hello dude', fields=('content',), or_=True))
         self.assertEqual(len(l), 1)
 
-        l = list(self.ObjectA.query.whoosh_search(u'hello dude', fields=('content',), or_=False))
+        l = list(ObjectA.query.whoosh_search(u'hello dude', fields=('content',), or_=False))
         self.assertEqual(len(l), 0)
 
-    def test_chaining(self):
-        self.app.db.session.add(self.ObjectA(title=u'title one', content=u'a poem'))
-        self.app.db.session.add(self.ObjectA(title=u'title two', content=u'about testing'))
-        self.app.db.session.add(self.ObjectA(title=u'title three', content=u'is delightfully tested'))
-        self.app.db.session.add(self.ObjectA(title=u'four', content=u'tests'))
-        self.app.db.session.commit()
+        # new function: test chaining
+        db.drop_all()
+        db.create_all()
 
-        self.assertEqual(len(list(self.ObjectA.query.whoosh_search(u'title'))), 3)
-        self.assertEqual(len(list(self.ObjectA.query.whoosh_search(u'test'))), 3)
+        db.session.add(ObjectA(title=u'title one', content=u'a poem'))
+        db.session.add(ObjectA(title=u'title two', content=u'about testing'))
+        db.session.add(ObjectA(title=u'title three', content=u'is delightfully tested'))
+        db.session.add(ObjectA(title=u'four', content=u'tests'))
+        db.session.commit()
+
+        self.assertEqual(len(list(ObjectA.query.whoosh_search(u'title'))), 3)
+        self.assertEqual(len(list(ObjectA.query.whoosh_search(u'test'))), 3)
 
         # chained query, operates as AND
-        self.assertEqual(len(list(self.ObjectA.query.whoosh_search(u'title').whoosh_search(u'test'))),
+        self.assertEqual(len(list(ObjectA.query.whoosh_search(u'title').whoosh_search(u'test'))),
                 2)
+
 
 #         self.assertEqual(len(recent), 1)
 #         self.assertEqual(recent[0].title, b.title)
-#         old = list(self.ObjectA.search_query(u'good').filter(self.ObjectA.created <= datetime.date.today() - datetime.timedelta(1)))
+#         old = list(ObjectA.search_query(u'good').filter(ObjectA.created <= datetime.date.today() - datetime.timedelta(1)))
 #         self.assertEqual(len(old), 1)
 #         self.assertEqual(old[0].title, a.title)
 

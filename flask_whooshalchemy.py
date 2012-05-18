@@ -103,6 +103,9 @@ class _QueryProxy(sqlalchemy.orm.Query):
 
         '''
 
+        if not isinstance(query, unicode):
+            query = unicode(query)
+
         results = self._whoosh_searcher(query, limit, fields, or_)
 
         if len(results) == 0:
@@ -221,7 +224,7 @@ def _after_flush(app, changes):
             bytype.setdefault(change[0].__class__.__name__, []).append((update,
                 change[0]))
 
-    for values in bytype.itervalues():
+    for model, values in bytype.iteritems():
         index = _whoosh_index(app, values[0][1])
         with index.writer() as writer:
             primary_field = values[0][1].pure_whoosh.primary_key_name
@@ -229,7 +232,15 @@ def _after_flush(app, changes):
 
             for update, v in values:
                 if update:
-                    attrs = dict((key, getattr(v, key)) for key in searchable)
+                    attrs = {}
+                    for key in searchable:
+                        try:
+                            attrs[key] = unicode(getattr(v, key))
+                        except AttributeError:
+                            raise AttributeError(
+                                    '%s does not have __searchable__ field %s'
+                                    % (model, key))
+
                     attrs[primary_field] = unicode(getattr(v, primary_field))
                     writer.update_document(**attrs)
                 else:
