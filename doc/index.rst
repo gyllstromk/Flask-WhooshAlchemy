@@ -1,7 +1,7 @@
 Welcome to Flask-WhooshAlchemy!
 ===============================
 
-Flask-WhooshAlchemy integrates the text-search functionality of `Whoosh <https://bitbucket.org/mchaput/whoosh/wiki/Home>`_ with the ORM of `SQLAlchemy <http://www.sqlalchemy.org/>`_ for use in `Flask <http://flask.pocoo.org/>`_ applications.
+Flask-WhooshAlchemy is a Flask extension that integrates the text-search functionality of `Whoosh <https://bitbucket.org/mchaput/whoosh/wiki/Home>`_ with the ORM of `SQLAlchemy <http://www.sqlalchemy.org/>`_ for use in `Flask <http://flask.pocoo.org/>`_ applications.
 
 Source code and issue tracking at `GitHub <http://github.com/gyllstromk/Flask-WhooshAlchemy>`_.
 
@@ -67,24 +67,27 @@ To execute a simple search:
 
     results = BlogPost.query.whoosh_search('cool')
 
-This will return all ``BlogPost`` instances in which at least one indexed field (i.e., 'title' or 'content') is a text match to the query. Results are ranked according to their relevance score, with the best match appearing first when iterating. The result of this call is a ``sqlalchemy.orm.Query`` object, so you can chain other SQL operations. For example:
+This will return all ``BlogPost`` instances in which at least one indexed field (i.e., 'title' or 'content') is a text match to the query. Results are ranked according to their relevance score, with the best match appearing first when iterating. The result of this call is a (subclass of) :class:`sqlalchemy.orm.query.Query` object, so you can chain other SQL operations. For example:
 
 ::
 
     two_days_ago = datetime.date.today() - datetime.timedelta(2)
-    recent_matches = BlogPost.query.whoosh_search('first').filter(BlogPost.created >= two_days_ago)
+    recent_matches = BlogPost.query.whoosh_search('first').filter(
+        BlogPost.created >= two_days_ago)
 
 Or, in alternative (likely slower) order:
 
 ::
 
-    recent_matches = BlogPost.query.filter(BlogPost.created >= two_days_ago).whoosh_search('first')
+    recent_matches = BlogPost.query.filter(
+        BlogPost.created >= two_days_ago).whoosh_search('first')
 
 We can limit results:
 
 ::
 
-    results = BlogPost.query.whoosh_search('cool', limit=2)  # only top two results returned
+    # get 2 best results:
+    results = BlogPost.query.whoosh_search('cool', limit=2)
 
 By default, the search is executed on all of the indexed fields as an OR conjunction. For example, if a model has 'title' and 'content' indicated as ``__searchable__``, a query will be checked against both fields, returning any instance whose title or content are a content match for the query. To specify particular fields to be checked, populate the ``fields`` parameter with the desired fields:
 
