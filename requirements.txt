@@ -1,0 +1,17 @@
+Flask==0.8
+Flask-SQLAlchemy==0.16
+Flask-Testing==0.3
+-e git+git@github.com:gyllstromk/Flask-WhooshAlchemy.git@c637ba2795dc5e5bd2a031b151b43bf0b4ecb3b2#egg=Flask_WhooshAlchemy-dev
+Jinja2==2.6
+SQLAlchemy==0.7.7
+Werkzeug==0.8.3
+Whoosh==2.4.0
+blinker==1.2
+distribute==0.6.24
+nose==1.1.2
+py==1.4.7
+simplejson==2.5.2
+tox==1.3
+twill==0.9
+virtualenv==1.7.1.2
+wsgiref==0.1.2
