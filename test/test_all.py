@@ -61,7 +61,7 @@ class Tests(TestCase):
             if e.errno != 2: # code 2 - no such file or directory
                 raise
 
-    def test_main(self):
+    def test_single_field(self):
         title1 = u'a slightly long title'
         title2 = u'another title'
         title3 = u'wow another title'
@@ -159,7 +159,54 @@ class Tests(TestCase):
         self.assertEqual(l[1].title, title3)
         self.assertEqual(l[2].title, title1)
         self.assertEqual(l[3].title, title4)
-# 
+
+        # test limit
+        l = list(self.ObjectA.query.whoosh_search(u'title', limit=2))
+        self.assertEqual(len(l), 2)
+        self.assertEqual(l[0].title, title5)
+        self.assertEqual(l[1].title, title3)
+
+    def test_multi_field(self):
+        title1 = u'my title'
+        self.app.db.session.add(self.ObjectA(title=title1, content=u'hello world'))
+        self.app.db.session.commit()
+
+        l = list(self.ObjectA.query.whoosh_search(u'title'))
+        self.assertEqual(len(l), 1)
+
+        l = list(self.ObjectA.query.whoosh_search(u'hello'))
+        self.assertEqual(len(l), 1)
+
+        l = list(self.ObjectA.query.whoosh_search(u'title', fields=('title',)))
+        self.assertEqual(len(l), 1)
+        l = list(self.ObjectA.query.whoosh_search(u'hello', fields=('title',)))
+        self.assertEqual(len(l), 0)
+
+        l = list(self.ObjectA.query.whoosh_search(u'title', fields=('content',)))
+        self.assertEqual(len(l), 0)
+        l = list(self.ObjectA.query.whoosh_search(u'hello', fields=('content',)))
+        self.assertEqual(len(l), 1)
+
+        l = list(self.ObjectA.query.whoosh_search(u'hello dude', fields=('content',), or_=True))
+        self.assertEqual(len(l), 1)
+
+        l = list(self.ObjectA.query.whoosh_search(u'hello dude', fields=('content',), or_=False))
+        self.assertEqual(len(l), 0)
+
+    def test_chaining(self):
+        self.app.db.session.add(self.ObjectA(title=u'title one', content=u'a poem'))
+        self.app.db.session.add(self.ObjectA(title=u'title two', content=u'about testing'))
+        self.app.db.session.add(self.ObjectA(title=u'title three', content=u'is delightfully tested'))
+        self.app.db.session.add(self.ObjectA(title=u'four', content=u'tests'))
+        self.app.db.session.commit()
+
+        self.assertEqual(len(list(self.ObjectA.query.whoosh_search(u'title'))), 3)
+        self.assertEqual(len(list(self.ObjectA.query.whoosh_search(u'test'))), 3)
+
+        # chained query, operates as AND
+        self.assertEqual(len(list(self.ObjectA.query.whoosh_search(u'title').whoosh_search(u'test'))),
+                2)
+
 #         self.assertEqual(len(recent), 1)
 #         self.assertEqual(recent[0].title, b.title)
 #         old = list(self.ObjectA.search_query(u'good').filter(self.ObjectA.created <= datetime.date.today() - datetime.timedelta(1)))

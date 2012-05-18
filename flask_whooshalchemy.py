@@ -19,6 +19,8 @@ from flask_sqlalchemy import models_committed
 
 import sqlalchemy
 
+from whoosh.qparser import OrGroup
+from whoosh.qparser import AndGroup
 from whoosh.qparser import MultifieldParser
 from whoosh.analysis import StemmingAnalyzer
 import whoosh.index
@@ -67,8 +69,8 @@ class _QueryProxy(sqlalchemy.orm.Query):
 
         return _inner()
 
-    def whoosh_search(self, query):
-        results = self._ws(query)
+    def whoosh_search(self, query, limit=None, fields=None, or_=False):
+        results = self._ws(query, limit, fields, or_)
 
         if len(results) == 0:
             return _EmptyQuery(self.model)
@@ -90,18 +92,23 @@ class _QueryProxy(sqlalchemy.orm.Query):
 
 
 class _Searcher(object):
-    ''' Assigned to a Model class as ``search_query``, which enables
-    text-querying. '''
+    ''' Assigned to a Model class as ``pure_search``, which enables
+    text-querying to whoosh hit list. '''
 
     def __init__(self, primary, indx):
         self.primary_key_name = primary
-        self.index = indx
+        self._index = indx
         self.searcher = indx.searcher()
-        fields = set(indx.schema._fields.keys()) - set([self.primary_key_name])
-        self.parser = MultifieldParser(list(fields), indx.schema)
+        self._all_fields = list(set(indx.schema._fields.keys()) -
+                set([self.primary_key_name]))
 
-    def __call__(self, query, limit=None):
-        return self.index.searcher().search(self.parser.parse(query),
+    def __call__(self, query, limit=None, fields=None, or_=False):
+        if fields is None:
+            fields = self._all_fields
+
+        group = OrGroup if or_ else AndGroup
+        parser = MultifieldParser(fields, self._index.schema, group=group)
+        return self._index.searcher().search(parser.parse(query),
                 limit=limit)
 
 
@@ -144,7 +151,7 @@ def _whoosh_index(app, model):
         model.__class__.query = _QueryProxy(model.__class__.query, primary,
                 searcher, model)
 
-        model.__class__.search_query = searcher
+        model.__class__.pure_whoosh = searcher
 
     return indx
 
@@ -164,7 +171,7 @@ def _get_whoosh_schema_and_primary(model):
     return Schema(**schema), primary
 
 
-def after_flush(app, changes):
+def _after_flush(app, changes):
     ''' Any db updates go through here. We check if any of these models have
     ``__searchable__`` fields, indicating they need to be indexed. With these
     we update the whoosh index for the model. If no index exists, it will be
@@ -182,7 +189,7 @@ def after_flush(app, changes):
     for values in bytype.itervalues():
         index = _whoosh_index(app, values[0][1])
         with index.writer() as writer:
-            primary_field = values[0][1].search_query.primary_key_name
+            primary_field = values[0][1].pure_whoosh.primary_key_name
             searchable = values[0][1].__searchable__
 
             for update, v in values:
@@ -195,4 +202,4 @@ def after_flush(app, changes):
                         primary_field)))
 
 
-models_committed.connect(after_flush)
+models_committed.connect(_after_flush)
