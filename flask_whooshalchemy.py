@@ -39,17 +39,29 @@ def _EmptyQuery(model):
 
 
 class _QueryProxy(sqlalchemy.orm.Query):
-    def __init__(self, query_obj, primary_key_name, ws, model, whoosh_rank=None):
+    # We're replacing the model's ``query`` field with this proxy. The main
+    # thing this proxy does is override the __iter__ method so that results are
+    # returned in the order of the whoosh score to reflect text-based ranking.
+
+    def __init__(self, query_obj, primary_key_name, whoosh_searcher, model):
+
+        # Make this a pure copy of the original Query object.
         self.__dict__ = query_obj.__dict__.copy()
+
         self._primary_key_name = primary_key_name
-        self._ws = ws
-        self.model = model
-        self._whoosh_rank = whoosh_rank
+        self._whoosh_searcher = whoosh_searcher
+        self._model = model
+
+        # Stores whoosh results from query. If ``None``, indicates that no
+        # whoosh query was performed.
+
+        self._whoosh_rank = None
 
     def __iter__(self):
         ''' Reorder ORM-db results according to Whoosh relevance score. '''
 
         super_iter = super(_QueryProxy, self).__iter__()
+
         if self._whoosh_rank is None:
             # Whoosh search hasn't been run so behave as normal.
 
@@ -59,6 +71,9 @@ class _QueryProxy(sqlalchemy.orm.Query):
         ordered_by_whoosh_rank = []
 
         for row in super_iter:
+            # Push items onto heap, where sort value is the rank provided by
+            # Whoosh
+
             heapq.heappush(ordered_by_whoosh_rank,
                 (self._whoosh_rank[unicode(getattr(row,
                     self._primary_key_name))], row))
@@ -88,10 +103,10 @@ class _QueryProxy(sqlalchemy.orm.Query):
 
         '''
 
-        results = self._ws(query, limit, fields, or_)
+        results = self._whoosh_searcher(query, limit, fields, or_)
 
         if len(results) == 0:
-            return _EmptyQuery(self.model)
+            return _EmptyQuery(self._model)
 
         result_set = set()
         result_ranks = {}
@@ -101,7 +116,7 @@ class _QueryProxy(sqlalchemy.orm.Query):
             result_set.add(pk)
             result_ranks[pk] = rank
 
-        f = self.filter(getattr(self.model.__class__,
+        f = self.filter(getattr(self._model.__class__,
             self._primary_key_name).in_(result_set))
 
         f._whoosh_rank = result_ranks
@@ -182,7 +197,9 @@ def _get_whoosh_schema_and_primary(model):
             schema[field.name] = whoosh.fields.ID(stored=True, unique=True)
             primary = field.name
         if field.name in model.__searchable__:
-            if type(field.type) == sqlalchemy.types.Text:
+            if isinstance(field.type, (sqlalchemy.types.Text,
+                sqlalchemy.types.String, sqlalchemy.types.Unicode)):
+
                 schema[field.name] = whoosh.fields.TEXT(
                         analyzer=StemmingAnalyzer())
 

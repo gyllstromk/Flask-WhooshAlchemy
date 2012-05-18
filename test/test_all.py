@@ -43,7 +43,7 @@ class Tests(TestCase):
 
             id = app.db.Column(app.db.Integer, primary_key=True)
             title = app.db.Column(app.db.Text)
-            content = app.db.Column(app.db.Text)
+            content = app.db.Column(app.db.String)
             ignored = app.db.Column(app.db.Text)
             created = app.db.Column(app.db.DateTime(), default=datetime.datetime.utcnow())
 
