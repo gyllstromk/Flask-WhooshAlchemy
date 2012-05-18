@@ -25,41 +25,80 @@ import whoosh.index
 from whoosh.fields import Schema
 #from whoosh.fields import ID, TEXT, KEYWORD, STORED
 
+import heapq
 import os
 
 
-def EmptyQuery(model):
+def _EmptyQuery(model):
     ''' Used to return empty set when whoosh-search results return nothing. '''
 
     # XXX is this efficient?
     return model.__class__.query.filter('null')
 
 
-class Searcher(object):
+class _QueryProxy(sqlalchemy.orm.Query):
+    def __init__(self, query_obj, primary_key_name, ws, model, whoosh_rank=None):
+        self.__dict__ = query_obj.__dict__.copy()
+        self._primary_key_name = primary_key_name
+        self._ws = ws
+        self.model = model
+        self._whoosh_rank = whoosh_rank
+
+    def __iter__(self):
+        ''' Reorder ORM-db results according to Whoosh relevance score. '''
+
+        if self._whoosh_rank is None:
+            return super(_QueryProxy, self).__iter__()
+
+        ordered_by_whoosh_rank = []
+
+        for row in super(_QueryProxy, self).__iter__():
+            heapq.heappush(ordered_by_whoosh_rank,
+                (self._whoosh_rank[unicode(getattr(row, self._primary_key_name))], row))
+
+        def _inner():
+            while ordered_by_whoosh_rank:
+                yield heapq.heappop(ordered_by_whoosh_rank)[1]
+
+        return _inner()
+
+    def whoosh_search(self, query):
+        results = self._ws(query)
+
+        if len(results) == 0:
+            return _EmptyQuery(self.model)
+
+        result_set = set()
+        result_ranks = {}
+
+        for rank, result in enumerate(results):
+            pk = result[self._primary_key_name]
+            result_set.add(pk)
+            result_ranks[pk] = rank
+
+        f = self.filter(getattr(self.model.__class__,
+            self._primary_key_name).in_(result_set))
+        f._whoosh_rank = result_ranks
+        return f
+
+
+class _Searcher(object):
     ''' Assigned to a Model class as ``search_query``, which enables
     text-querying. '''
 
-    def __init__(self, model, primary, indx):
-        self.model = model
-        self.primary = primary
+    def __init__(self, primary, indx):
+        self.primary_key_name = primary
         self.index = indx
         self.searcher = indx.searcher()
-        fields = set(indx.schema._fields.keys()) - set([self.primary])
+        fields = set(indx.schema._fields.keys()) - set([self.primary_key_name])
         self.parser = MultifieldParser(list(fields), indx.schema)
 
     def __call__(self, query, limit=None):
-        results = [x[self.primary] for x in
-                self.index.searcher().search(self.parser.parse(query),
-                    limit=limit)]
-
-        if len(results) == 0:
-            return EmptyQuery(self.model)
-
-        return self.model.__class__.query.filter(getattr(self.model.__class__,
-            self.primary).in_(results))
+        return self.index.searcher().search(self.parser.parse(query),
+                limit=limit)
 
 
-def whoosh_index(app, model):
+def _whoosh_index(app, model):
     # gets the whoosh index for this model, creating one if it does not exist.
     # in creating one, a schema is created based on the fields of the model.
     # Currently we only support primary key -> whoosh.ID, and sqlalchemy.TEXT
@@ -73,7 +112,7 @@ def whoosh_index(app, model):
 
     if indx is None:
         if not app.config.get('WHOOSH_BASE'):
-            # XXX todo: is there a better approach to handle the absense of a
+            # XXX todo: is there a better approach to handle the absenSe of a
             # config value for whoosh base? Should we throw an exception? If
             # so, this exception will be thrown in the after_commit function,
             # which is probably not ideal.
@@ -94,7 +133,11 @@ def whoosh_index(app, model):
             indx = whoosh.index.create_in(wi, schema)
 
         app.whoosh_indexes[model.__class__.__name__] = indx
-        model.__class__.search_query = Searcher(model, primary, indx)
+        searcher = _Searcher(primary, indx)
+        model.__class__.query = _QueryProxy(model.__class__.query, primary,
+                searcher, model)
+
+        model.__class__.search_query = searcher
 
     return indx
 
@@ -130,9 +173,9 @@ def after_flush(app, changes):
                 change[0]))
 
     for values in bytype.itervalues():
-        index = whoosh_index(app, values[0][1])
+        index = _whoosh_index(app, values[0][1])
         with index.writer() as writer:
-            primary_field = values[0][1].search_query.primary
+            primary_field = values[0][1].search_query.primary_key_name
             searchable = values[0][1].__searchable__
 
             for update, v in values:

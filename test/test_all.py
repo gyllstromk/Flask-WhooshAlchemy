@@ -25,18 +25,31 @@ class Tests(TestCase):
 
         app.db = SQLAlchemy(app)
 
-        class ObjectA(app.db.Model):
-            __tablename__ = 'objectA'
-            __searchable__ = ['title']
+        class BlogishBlob(object):
+            __searchable__ = ['title', 'content']
 
             id = app.db.Column(app.db.Integer, primary_key=True)
             title = app.db.Column(app.db.Text)
+            content = app.db.Column(app.db.Text)
+            ignored = app.db.Column(app.db.Text)
             created = app.db.Column(app.db.DateTime(), default=datetime.datetime.utcnow())
 
             def __repr__(self):
                 return '{0}(title={1})'.format(self.__class__.__name__, self.title)
 
+
+        class ObjectA(app.db.Model, BlogishBlob):
+            __tablename__ = 'objectA'
+            __searchable__ = ['title', 'content']
+
+
+        class ObjectB(app.db.Model, BlogishBlob):
+            __tablename__ = 'objectB'
+            __searchable__ = ['title', 'content']
+
         self.ObjectA = ObjectA
+        self.ObjectB = ObjectB
+
         app.db.create_all()
 
         return app
@@ -49,46 +62,109 @@ class Tests(TestCase):
                 raise
 
     def test_main(self):
-        def add(title):
-            item = self.ObjectA(title=title)
-            self.app.db.session.add(item)
-            self.app.db.session.commit()
-            return item
+        title1 = u'a slightly long title'
+        title2 = u'another title'
+        title3 = u'wow another title'
 
-        a = add(u'good times were had by all')
-        res = list(self.ObjectA.search_query(u'good'))
-        self.assertEqual(len(res), 1)
-        self.assertEqual(res[0].id, a.id)
-
-        b = add(u'good natured people are fun')
-        res = list(self.ObjectA.search_query(u'good'))
-        self.assertEqual(len(res), 2)
-        self.assertEqual(res[0].id, a.id)
-        self.assertEqual(res[1].id, b.id)
-
-        res = list(self.ObjectA.search_query(u'people'))
-        self.assertEqual(len(res), 1)
-        self.assertEqual(res[0].id, b.id)
-
-        a = self.ObjectA.query.get(1)
-        self.app.db.session.delete(a)
+        self.app.db.session.add(self.ObjectA(title=title1, content=u'hello world'))
         self.app.db.session.commit()
 
-        res = list(self.ObjectA.search_query(u'good'))
-        self.assertEqual(len(res), 1)
-        self.assertEqual(res[0].id, b.id)
+        self.assertEqual(len(list(self.ObjectA.query.whoosh_search(u'what'))), 0)
+        self.assertEqual(len(list(self.ObjectA.query.whoosh_search(u'title'))), 1)
+        self.assertEqual(len(list(self.ObjectA.query.whoosh_search(u'hello'))), 1)
 
-        a = self.ObjectA(title=u'good old post', created=datetime.date.today() - datetime.timedelta(2))
-        self.app.db.session.add(a)
+        self.app.db.session.add(self.ObjectB(title=u'my title', content=u'hello world'))
         self.app.db.session.commit()
-        res = list(self.ObjectA.search_query(u'good'))
-        self.assertEqual(len(res), 2)
-        recent = list(self.ObjectA.search_query(u'good').filter(self.ObjectA.created >= datetime.date.today() - datetime.timedelta(1)))
-        self.assertEqual(len(recent), 1)
-        self.assertEqual(recent[0].title, b.title)
-        old = list(self.ObjectA.search_query(u'good').filter(self.ObjectA.created <= datetime.date.today() - datetime.timedelta(1)))
-        self.assertEqual(len(old), 1)
-        self.assertEqual(old[0].title, a.title)
+
+        # make sure does not interfere with ObjectA's results
+        self.assertEqual(len(list(self.ObjectA.query.whoosh_search(u'what'))), 0)
+        self.assertEqual(len(list(self.ObjectA.query.whoosh_search(u'title'))), 1)
+        self.assertEqual(len(list(self.ObjectA.query.whoosh_search(u'hello'))), 1)
+
+        self.assertEqual(len(list(self.ObjectB.query.whoosh_search(u'what'))), 0)
+        self.assertEqual(len(list(self.ObjectB.query.whoosh_search(u'title'))), 1)
+        self.assertEqual(len(list(self.ObjectB.query.whoosh_search(u'hello'))), 1)
+
+        self.app.db.session.add(self.ObjectA(title=title2, content=u'a different message'))
+        self.app.db.session.commit()
+
+        self.assertEqual(len(list(self.ObjectA.query.whoosh_search(u'what'))), 0)
+        l = list(self.ObjectA.query.whoosh_search(u'title'))
+        self.assertEqual(len(l), 2)
+
+        # ranking should always be as follows, since title2 should have a higher relevance score
+
+        self.assertEqual(l[0].title, title2)
+        self.assertEqual(l[1].title, title1)
+
+        self.assertEqual(len(list(self.ObjectA.query.whoosh_search(u'hello'))), 1)
+        self.assertEqual(len(list(self.ObjectA.query.whoosh_search(u'message'))), 1)
+
+        self.assertEqual(len(list(self.ObjectB.query.whoosh_search(u'what'))), 0)
+        self.assertEqual(len(list(self.ObjectB.query.whoosh_search(u'title'))), 1)
+        self.assertEqual(len(list(self.ObjectB.query.whoosh_search(u'hello'))), 1)
+        self.assertEqual(len(list(self.ObjectB.query.whoosh_search(u'message'))), 0)
+
+        self.app.db.session.add(self.ObjectA(title=title3, content=u'a different message'))
+        self.app.db.session.commit()
+
+        l = list(self.ObjectA.query.whoosh_search(u'title'))
+        self.assertEqual(len(l), 3)
+        self.assertEqual(l[0].title, title2)
+        self.assertEqual(l[1].title, title3)
+        self.assertEqual(l[2].title, title1)
+
+        self.app.db.session.delete(self.ObjectA.query.get(2))
+        self.app.db.session.commit()
+
+        l = list(self.ObjectA.query.whoosh_search(u'title'))
+        self.assertEqual(len(l), 2)
+        self.assertEqual(l[0].title, title3)
+        self.assertEqual(l[1].title, title1)
+
+        two_days_ago = datetime.date.today() - datetime.timedelta(2)
+
+        title4 = u'a title that is significantly longer than the others'
+
+        self.app.db.session.add(self.ObjectA(title=title4, created=two_days_ago))
+        self.app.db.session.commit()
+
+        one_day_ago = datetime.date.today() - datetime.timedelta(1)
+
+        recent = list(self.ObjectA.query.whoosh_search(u'title')
+                .filter(self.ObjectA.created >= one_day_ago))
+
+        self.assertEqual(len(recent), 2)
+        self.assertEqual(l[0].title, title3)
+        self.assertEqual(l[1].title, title1)
+
+        three_days_ago = datetime.date.today() - datetime.timedelta(3)
+
+        l = list(self.ObjectA.query.whoosh_search(u'title')
+                .filter(self.ObjectA.created >= three_days_ago))
+
+        self.assertEqual(len(l), 3)
+        self.assertEqual(l[0].title, title3)
+        self.assertEqual(l[1].title, title1)
+        self.assertEqual(l[2].title, title4)
+
+        title5 = u'title with title as frequent title word'
+
+        self.app.db.session.add(self.ObjectA(title=title5))
+        self.app.db.session.commit()
+
+        l = list(self.ObjectA.query.whoosh_search(u'title'))
+        self.assertEqual(len(l), 4)
+        self.assertEqual(l[0].title, title5)
+        self.assertEqual(l[1].title, title3)
+        self.assertEqual(l[2].title, title1)
+        self.assertEqual(l[3].title, title4)
+# 
+#         self.assertEqual(len(recent), 1)
+#         self.assertEqual(recent[0].title, b.title)
+#         old = list(self.ObjectA.search_query(u'good').filter(self.ObjectA.created <= datetime.date.today() - datetime.timedelta(1)))
+#         self.assertEqual(len(old), 1)
+#         self.assertEqual(old[0].title, a.title)
 
 
 if __name__ == '__main__':
