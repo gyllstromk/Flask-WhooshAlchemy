@@ -26,6 +26,7 @@ setup(
     install_requires=[x.strip() for x in
         open(os.path.join(os.path.dirname(__file__),
             'requirements.txt')).xreadlines()],
+    tests_require=['Flask-Testing'],
 
     classifiers=[
         'Environment :: Web Environment',
@@ -36,5 +37,5 @@ setup(
         'Topic :: Internet :: WWW/HTTP :: Dynamic Content',
         'Topic :: Software Development :: Libraries :: Python Modules'
     ],
-    test_suite = 'test.test_all',
+    test_suite='test.test_all',
 )
