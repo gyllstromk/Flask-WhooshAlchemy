@@ -25,7 +25,7 @@ First we'll set up the environment and create our model:
 
 ::
 
-    import flask_whooshalchemy
+    import flask.ext.whooshalchemy
 
     # set the location for the whoosh index
     app.config['WHOOSH_BASE'] = 'path/to/whoosh/base'
@@ -33,7 +33,7 @@ First we'll set up the environment and create our model:
 
     class BlogPost(db.Model):
       __tablename__ = 'blogpost'
-      __searchable__ = ['title', 'body']  # these fields will be indexed by whoosh
+      __searchable__ = ['title', 'content']  # these fields will be indexed by whoosh
 
       id = app.db.Column(app.db.Integer, primary_key=True)
       title = app.db.Column(app.db.Text)
