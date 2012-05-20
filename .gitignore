@@ -1,0 +1,12 @@
+.*
+*.pyc
+*.egg-info
+*.orig
+bin/*
+build/*
+dist/*
+include/*
+lib/*
+src/*
+!.gitignore
+
