@@ -1,0 +1,8 @@
+build
+env/*
+.tox
+Flask_WhooshAlchemy.egg-info/
+dist/
+*.swp
+*.pyc
+doc/_build
