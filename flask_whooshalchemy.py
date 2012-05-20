@@ -15,7 +15,7 @@ from __future__ import with_statement
 from __future__ import absolute_import
 
 
-from flask_sqlalchemy import models_committed
+from flask.ext.sqlalchemy import models_committed
 
 import sqlalchemy
 
@@ -29,13 +29,6 @@ from whoosh.fields import Schema
 
 import heapq
 import os
-
-
-def _EmptyQuery(model):
-    ''' Used to return empty set when whoosh-search results return nothing. '''
-
-    # XXX is this efficient?
-    return model.__class__.query.filter('null')
 
 
 class _QueryProxy(sqlalchemy.orm.Query):
@@ -109,7 +102,13 @@ class _QueryProxy(sqlalchemy.orm.Query):
         results = self._whoosh_searcher(query, limit, fields, or_)
 
         if len(results) == 0:
-            return _EmptyQuery(self._model)
+            # We don't want to proceed with empty results because we get a
+            # stderr warning from sqlalchemy when executing 'in_' on empty set.
+            # However we cannot just return an empty list because it will not
+            # be a query.
+
+            # XXX is this efficient?
+            return self.filter('null')
 
         result_set = set()
         result_ranks = {}
@@ -148,60 +147,65 @@ class _Searcher(object):
                 limit=limit)
 
 
-def _whoosh_index(app, model):
+def _get_whoosh_index(app, model):
     # gets the whoosh index for this model, creating one if it does not exist.
-    # in creating one, a schema is created based on the fields of the model.
-    # Currently we only support primary key -> whoosh.ID, and sqlalchemy.TEXT
-    # -> whoosh.TEXT, but can add more later. A dict of model -> whoosh index
-    # is added to the ``app`` variable.
+    # A dict of model -> whoosh index is added to the ``app`` variable.
 
     if not hasattr(app, 'whoosh_indexes'):
         app.whoosh_indexes = {}
 
-    indx = app.whoosh_indexes.get(model.__class__.__name__)
+    return app.whoosh_indexes.get(model.__class__.__name__,
+                _create_index(app, model))
 
-    if indx is None:
-        if not app.config.get('WHOOSH_BASE'):
-            # XXX todo: is there a better approach to handle the absenSe of a
-            # config value for whoosh base? Should we throw an exception? If
-            # so, this exception will be thrown in the after_commit function,
-            # which is probably not ideal.
 
-            app.config['WHOOSH_BASE'] = 'whoosh_index'
+def _create_index(app, model):
+    # a schema is created based on the fields of the model. Currently we only
+    # support primary key -> whoosh.ID, and sqlalchemy.(String, Unicode, Text)
+    # -> whoosh.TEXT.
 
-        # we index per model.
-        wi = os.path.join(app.config.get('WHOOSH_BASE'),
-                model.__class__.__name__)
+    if not app.config.get('WHOOSH_BASE'):
+        # XXX todo: is there a better approach to handle the absenSe of a
+        # config value for whoosh base? Should we throw an exception? If
+        # so, this exception will be thrown in the after_commit function,
+        # which is probably not ideal.
 
-        schema, primary = _get_whoosh_schema_and_primary(model)
+        app.config['WHOOSH_BASE'] = 'whoosh_index'
 
-        if whoosh.index.exists_in(wi):
-            indx = whoosh.index.open_dir(wi)
-        else:
-            if not os.path.exists(wi):
-                os.makedirs(wi)
-            indx = whoosh.index.create_in(wi, schema)
+    # we index per model.
+    wi = os.path.join(app.config.get('WHOOSH_BASE'),
+            model.__class__.__name__)
 
-        app.whoosh_indexes[model.__class__.__name__] = indx
-        searcher = _Searcher(primary, indx)
-        model.__class__.query = _QueryProxy(model.__class__.query, primary,
-                searcher, model)
+    schema, primary_key = _get_whoosh_schema_and_primary_key(model)
 
-        model.__class__.pure_whoosh = searcher
+    if whoosh.index.exists_in(wi):
+        indx = whoosh.index.open_dir(wi)
+    else:
+        if not os.path.exists(wi):
+            os.makedirs(wi)
+        indx = whoosh.index.create_in(wi, schema)
+
+    app.whoosh_indexes[model.__class__.__name__] = indx
+    searcher = _Searcher(primary_key, indx)
+    model.__class__.query = _QueryProxy(model.__class__.query, primary_key,
+            searcher, model)
+
+    model.__class__.pure_whoosh = searcher
 
     return indx
 
 
-def _get_whoosh_schema_and_primary(model):
+def _get_whoosh_schema_and_primary_key(model):
     schema = {}
     primary = None
+    searchable = set(model.__searchable__)
     for field in model.__table__.columns:
         if field.primary_key:
             schema[field.name] = whoosh.fields.ID(stored=True, unique=True)
             primary = field.name
-        if field.name in model.__searchable__:
-            if isinstance(field.type, (sqlalchemy.types.Text,
-                sqlalchemy.types.String, sqlalchemy.types.Unicode)):
+
+        if field.name in searchable and isinstance(field.type,
+                (sqlalchemy.types.Text, sqlalchemy.types.String,
+                    sqlalchemy.types.Unicode)):
 
                 schema[field.name] = whoosh.fields.TEXT(
                         analyzer=StemmingAnalyzer())
@@ -210,11 +214,11 @@ def _get_whoosh_schema_and_primary(model):
 
 
 def _after_flush(app, changes):
-    ''' Any db updates go through here. We check if any of these models have
-    ``__searchable__`` fields, indicating they need to be indexed. With these
-    we update the whoosh index for the model. If no index exists, it will be
-    created here; this could impose a penalty on the initial commit of a model.
-    '''
+    # Any db updates go through here. We check if any of these models have
+    # ``__searchable__`` fields, indicating they need to be indexed. With these
+    # we update the whoosh index for the model. If no index exists, it will be
+    # created here; this could impose a penalty on the initial commit of a
+    # model.
 
     bytype = {}  # sort changes by type so we can use per-model writer
     for change in changes:
@@ -225,7 +229,7 @@ def _after_flush(app, changes):
                 change[0]))
 
     for model, values in bytype.iteritems():
-        index = _whoosh_index(app, values[0][1])
+        index = _get_whoosh_index(app, values[0][1])
         with index.writer() as writer:
             primary_field = values[0][1].pure_whoosh.primary_key_name
             searchable = values[0][1].__searchable__
