@@ -1,12 +1,4 @@
-Flask==0.8
 Flask-SQLAlchemy==0.16
-Flask-Testing==0.3
-Jinja2==2.6
 SQLAlchemy==0.7.7
-Werkzeug==0.8.3
 Whoosh==2.4.0
 blinker==1.2
-distribute==0.6.24
-simplejson==2.5.2
-twill==0.9
-wsgiref==0.1.2
