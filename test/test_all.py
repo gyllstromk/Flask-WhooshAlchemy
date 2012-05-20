@@ -14,9 +14,9 @@
 from __future__ import absolute_import
 
 from flask import Flask
-from flask_sqlalchemy import SQLAlchemy
-from flaskext.testing import TestCase
-import flask_whooshalchemy
+from flask.ext.sqlalchemy import SQLAlchemy
+from flask.ext.testing import TestCase
+import flask.ext.whooshalchemy
 
 import datetime
 import os
@@ -46,7 +46,7 @@ class ObjectA(db.Model, BlogishBlob):
 
 class ObjectB(db.Model, BlogishBlob):
     __tablename__ = 'objectB'
-    __searchable__ = ['title', 'content', 'content'] # dup intentional
+    __searchable__ = ['title', 'content', 'content']  # dup intentional
 
 
 class ObjectC(db.Model, BlogishBlob):
@@ -54,10 +54,9 @@ class ObjectC(db.Model, BlogishBlob):
     __searchable__ = ['title', 'field_that_doesnt_exist']
 
 
-
 class Tests(TestCase):
-    DATABASE_URL='sqlite://'
-    TESTING=True
+    DATABASE_URL = 'sqlite://'
+    TESTING = True
 
     def create_app(self):
         tmp_dir = tempfile.mkdtemp()
@@ -76,7 +75,7 @@ class Tests(TestCase):
         try:
             shutil.rmtree(self.app.config['WHOOSH_BASE'])
         except OSError, e:
-            if e.errno != 2: # code 2 - no such file or directory
+            if e.errno != 2:  # code 2 - no such file or directory
                 raise
 
         db.session.remove()
