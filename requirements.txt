@@ -2,8 +2,3 @@ Flask-SQLAlchemy==0.16
 SQLAlchemy==0.7.7
 Whoosh==2.4.0
 blinker==1.2
-<<<<<<< HEAD
-=======
-
-
->>>>>>> aac4e0c2611d91ba14933c7188edcff40ee243cf
