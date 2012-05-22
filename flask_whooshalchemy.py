@@ -79,9 +79,10 @@ class _QueryProxy(sqlalchemy.orm.Query):
 
     def whoosh_search(self, query, limit=None, fields=None, or_=False):
         '''
-        
+
         Execute text query on database. Results have a text-based
-        match to the query, ranked by the scores from the underlying Whoosh index.
+        match to the query, ranked by the scores from the underlying Whoosh
+        index.
 
         By default, the search is executed on all of the indexed fields as an
         OR conjunction. For example, if a model has 'title' and 'content'
@@ -207,8 +208,8 @@ def _get_whoosh_schema_and_primary_key(model):
                 (sqlalchemy.types.Text, sqlalchemy.types.String,
                     sqlalchemy.types.Unicode)):
 
-                schema[field.name] = whoosh.fields.TEXT(
-                        analyzer=StemmingAnalyzer())
+            schema[field.name] = whoosh.fields.TEXT(
+                    analyzer=StemmingAnalyzer())
 
     return Schema(**schema), primary
 
