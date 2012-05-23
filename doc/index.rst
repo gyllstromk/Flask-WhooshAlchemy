@@ -21,7 +21,7 @@ Or:
 Quickstart
 ----------
 
-First we'll set up the environment and create our model:
+Let's set up the environment and create our model:
 
 ::
 
@@ -100,4 +100,3 @@ By default, results will only be returned if they contain all of the query terms
 ::
 
     results = BlogPost.query.whoosh_search('cool', or_=True)
-
