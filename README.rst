@@ -1,5 +1,5 @@
 Flask-WhooshAlchemy extension
-===================
+=============================
 
 Supports the easy text-indexing of SQLAlchemy model fields using Whoosh.
 
