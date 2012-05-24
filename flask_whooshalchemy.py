@@ -102,7 +102,7 @@ class _QueryProxy(sqlalchemy.orm.Query):
 
         results = self._whoosh_searcher(query, limit, fields, or_)
 
-        if len(results) == 0:
+        if not results:
             # We don't want to proceed with empty results because we get a
             # stderr warning from sqlalchemy when executing 'in_' on empty set.
             # However we cannot just return an empty list because it will not
