@@ -16,7 +16,7 @@ from __future__ import absolute_import
 from flask import Flask
 from flask.ext.sqlalchemy import SQLAlchemy
 from flask.ext.testing import TestCase
-import flask.ext.whooshalchemy
+import flask.ext.whooshalchemy as wa
 
 import datetime
 import os
@@ -37,6 +37,11 @@ class BlogishBlob(object):
 
     def __repr__(self):
         return '{0}(title={1})'.format(self.__class__.__name__, self.title)
+
+
+def _after_flush(app, changes):
+    from sqlalchemy.orm import EXT_CONTINUE
+    return EXT_CONTINUE
 
 
 class ObjectA(db.Model, BlogishBlob):
@@ -78,8 +83,21 @@ class Tests(TestCase):
             if e.errno != 2:  # code 2 - no such file or directory
                 raise
 
-        db.session.remove()
         db.drop_all()
+
+    def test_flask_fail(self):
+        # XXX This fails due to a bug in Flask-SQLAlchemy that affects
+        # Flask-WhooshAlchemy. I submitted a pull request with a fix that is
+        # pending.
+
+        from flask.ext.sqlalchemy import before_models_committed, models_committed
+        
+        before_models_committed.connect(_after_flush)
+        models_committed.connect(_after_flush)
+        db.session.add(ObjectB(title=u'my title', content=u'hello world'))
+        db.session.add(ObjectA(title=u'a title', content=u'hello world'))
+        db.session.flush()
+        db.session.commit()
 
     def test_all(self):
         title1 = u'a slightly long title'

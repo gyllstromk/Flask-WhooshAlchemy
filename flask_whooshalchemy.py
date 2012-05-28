@@ -31,6 +31,12 @@ import heapq
 import os
 
 
+__searchable__ = '__searchable__'
+
+
+DEFAULT_WHOOSH_INDEX_NAME = 'whoosh_index'
+
+
 class _QueryProxy(sqlalchemy.orm.Query):
     # We're replacing the model's ``query`` field with this proxy. The main
     # thing this proxy does is override the __iter__ method so that results are
@@ -43,7 +49,7 @@ class _QueryProxy(sqlalchemy.orm.Query):
 
         self._primary_key_name = primary_key_name
         self._whoosh_searcher = whoosh_searcher
-        self._model = model
+        self._modelclass = model
 
         # Stores whoosh results from query. If ``None``, indicates that no
         # whoosh query was performed.
@@ -119,7 +125,7 @@ class _QueryProxy(sqlalchemy.orm.Query):
             result_set.add(pk)
             result_ranks[pk] = rank
 
-        f = self.filter(getattr(self._model.__class__,
+        f = self.filter(getattr(self._modelclass,
             self._primary_key_name).in_(result_set))
 
         f._whoosh_rank = result_ranks
@@ -148,14 +154,17 @@ class _Searcher(object):
                 limit=limit)
 
 
-def _get_whoosh_index(app, model):
+def whoosh_index(app, model):
+    ''' Create whoosh index for ``model``, if one does not exist. If 
+    the index exists it is opened and cached. '''
+
     # gets the whoosh index for this model, creating one if it does not exist.
     # A dict of model -> whoosh index is added to the ``app`` variable.
 
     if not hasattr(app, 'whoosh_indexes'):
         app.whoosh_indexes = {}
 
-    return app.whoosh_indexes.get(model.__class__.__name__,
+    return app.whoosh_indexes.get(model.__name__,
                 _create_index(app, model))
 
 
@@ -170,11 +179,11 @@ def _create_index(app, model):
         # so, this exception will be thrown in the after_commit function,
         # which is probably not ideal.
 
-        app.config['WHOOSH_BASE'] = 'whoosh_index'
+        app.config['WHOOSH_BASE'] = DEFAULT_WHOOSH_INDEX_NAME
 
     # we index per model.
     wi = os.path.join(app.config.get('WHOOSH_BASE'),
-            model.__class__.__name__)
+            model.__name__)
 
     schema, primary_key = _get_whoosh_schema_and_primary_key(model)
 
@@ -185,12 +194,12 @@ def _create_index(app, model):
             os.makedirs(wi)
         indx = whoosh.index.create_in(wi, schema)
 
-    app.whoosh_indexes[model.__class__.__name__] = indx
+    app.whoosh_indexes[model.__name__] = indx
     searcher = _Searcher(primary_key, indx)
-    model.__class__.query = _QueryProxy(model.__class__.query, primary_key,
+    model.query = _QueryProxy(model.query, primary_key,
             searcher, model)
 
-    model.__class__.pure_whoosh = searcher
+    model.pure_whoosh = searcher
 
     return indx
 
@@ -225,12 +234,12 @@ def _after_flush(app, changes):
     for change in changes:
         update = change[1] in ('update', 'insert')
 
-        if hasattr(change[0].__class__, '__searchable__'):
+        if hasattr(change[0].__class__, __searchable__):
             bytype.setdefault(change[0].__class__.__name__, []).append((update,
                 change[0]))
 
     for model, values in bytype.iteritems():
-        index = _get_whoosh_index(app, values[0][1])
+        index = whoosh_index(app, values[0][1].__class__)
         with index.writer() as writer:
             primary_field = values[0][1].pure_whoosh.primary_key_name
             searchable = values[0][1].__searchable__
@@ -242,9 +251,8 @@ def _after_flush(app, changes):
                         try:
                             attrs[key] = unicode(getattr(v, key))
                         except AttributeError:
-                            raise AttributeError(
-                                    '%s does not have __searchable__ field %s'
-                                    % (model, key))
+                            raise AttributeError('{0} does not have {1} field {2}'
+                                    .format(model, __searchable__, key))
 
                     attrs[primary_field] = unicode(getattr(v, primary_field))
                     writer.update_document(**attrs)
@@ -254,3 +262,11 @@ def _after_flush(app, changes):
 
 
 models_committed.connect(_after_flush)
+
+
+# def init_app(db):
+#     app = db.get_app()
+# #    for table in db.get_tables_for_bind():
+#     for item in globals():
+# 
+#        #_create_index(app, table)
