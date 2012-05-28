@@ -11,7 +11,7 @@ import os
 
 setup(
     name='Flask-WhooshAlchemy',
-    version=os.popen('git tag').read().strip(),
+    version='0.54a',
     url='https://github.com/gyllstromk/Flask-WhooshAlchemy',
     license='BSD',
     author='Karl Gyllstrom',

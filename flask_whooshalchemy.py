@@ -15,7 +15,7 @@ from __future__ import with_statement
 from __future__ import absolute_import
 
 
-from flask.ext.sqlalchemy import models_committed
+import flask.ext.sqlalchemy as flask_sqlalchemy
 
 import sqlalchemy
 
@@ -37,7 +37,7 @@ __searchable__ = '__searchable__'
 DEFAULT_WHOOSH_INDEX_NAME = 'whoosh_index'
 
 
-class _QueryProxy(sqlalchemy.orm.Query):
+class _QueryProxy(flask_sqlalchemy.BaseQuery):
     # We're replacing the model's ``query`` field with this proxy. The main
     # thing this proxy does is override the __iter__ method so that results are
     # returned in the order of the whoosh score to reflect text-based ranking.
@@ -261,7 +261,7 @@ def _after_flush(app, changes):
                         primary_field)))
 
 
-models_committed.connect(_after_flush)
+flask_sqlalchemy.models_committed.connect(_after_flush)
 
 
 # def init_app(db):
