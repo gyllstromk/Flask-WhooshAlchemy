@@ -1,4 +1,3 @@
-
 Welcome to Flask-WhooshAlchemy!
 ===============================
 
@@ -6,7 +5,7 @@ Flask-WhooshAlchemy is a Flask extension that integrates the text-search functio
 
 Source code and issue tracking at `GitHub <http://github.com/gyllstromk/Flask-WhooshAlchemy>`_.
 
-View the `official docs` at `http://packages.python.org/Flask-WhooshAlchemy/`_.
+View the official docs at http://packages.python.org/Flask-WhooshAlchemy/.
 
 Install
 -------
