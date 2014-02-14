@@ -185,7 +185,11 @@ def _create_index(app, model):
     wi = os.path.join(app.config.get('WHOOSH_BASE'),
             model.__name__)
 
-    schema, primary_key = _get_whoosh_schema_and_primary_key(model)
+    if not app.config.get('WHOOSH_ANALYZER'):
+        app.config['WHOOSH_ANALYZER'] = StemmingAnalyzer()
+    analyzer = app.config['WHOOSH_ANALYZER']
+
+    schema, primary_key = _get_whoosh_schema_and_primary_key(model, analyzer)
 
     if whoosh.index.exists_in(wi):
         indx = whoosh.index.open_dir(wi)
@@ -204,7 +208,7 @@ def _create_index(app, model):
     return indx
 
 
-def _get_whoosh_schema_and_primary_key(model):
+def _get_whoosh_schema_and_primary_key(model, analyzer=StemmingAnalyzer()):
     schema = {}
     primary = None
     searchable = set(model.__searchable__)
@@ -217,8 +221,7 @@ def _get_whoosh_schema_and_primary_key(model):
                 (sqlalchemy.types.Text, sqlalchemy.types.String,
                     sqlalchemy.types.Unicode)):
 
-            schema[field.name] = whoosh.fields.TEXT(
-                    analyzer=StemmingAnalyzer())
+            schema[field.name] = whoosh.fields.TEXT(analyzer=analyzer)
 
     return Schema(**schema), primary
 
