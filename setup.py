@@ -25,7 +25,7 @@ setup(
     platforms='any',
     install_requires=[x.strip() for x in
         open(os.path.join(os.path.dirname(__file__),
-            'requirements.txt')).xreadlines()],
+            'requirements.txt'))],
     tests_require=['Flask-Testing'],
 
     classifiers=[
