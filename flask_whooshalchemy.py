@@ -198,7 +198,10 @@ def _create_index(app, model):
     wi = os.path.join(app.config.get('WHOOSH_BASE'),
             model.__name__)
 
-    analyzer = app.config.get('WHOOSH_ANALYZER')
+    if not app.config.get('WHOOSH_ANALYZER'):
+        app.config['WHOOSH_ANALYZER'] = StemmingAnalyzer()
+    analyzer = app.config['WHOOSH_ANALYZER']
+
     schema, primary_key = _get_whoosh_schema_and_primary_key(model, analyzer)
 
     if whoosh.index.exists_in(wi):
@@ -218,7 +221,7 @@ def _create_index(app, model):
     return indx
 
 
-def _get_whoosh_schema_and_primary_key(model, analyzer=StemmingAnalyzer):
+def _get_whoosh_schema_and_primary_key(model, analyzer=StemmingAnalyzer()):
     schema = {}
     primary = None
     searchable = set(model.__searchable__)
