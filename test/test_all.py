@@ -69,27 +69,26 @@ class Tests(TestCase):
         app = Flask(__name__)
 
         app.config['WHOOSH_BASE'] = os.path.join(tmp_dir, 'whoosh')
+        db.init_app(app)
 
         return app
 
     def setUp(self):
-        db.init_app(self.app)
         db.create_all()
 
     def tearDown(self):
         try:
-            shutil.rmtree(self.app.config['WHOOSH_BASE'])
+            pass
+            #shutil.rmtree(self.app.config['WHOOSH_BASE'])
         except OSError as e:
             if e.errno != 2:  # code 2 - no such file or directory
                 raise
 
+        db.session.remove()
         db.drop_all()
 
-    def test_flask_fail(self):
-        # XXX This fails due to a bug in Flask-SQLAlchemy that affects
-        # Flask-WhooshAlchemy. I submitted a pull request with a fix that is
-        # pending.
-
+    def test_flask(self):
+        """Used to fail due to a bug in Flask-SQLAlchemy."""
         from flask.ext.sqlalchemy import before_models_committed, models_committed
         
         before_models_committed.connect(_after_flush)
@@ -99,43 +98,60 @@ class Tests(TestCase):
         db.session.flush()
         db.session.commit()
 
-    def test_all(self):
-        title1 = u'a slightly long title'
-        title2 = u'another title'
-        title3 = u'wow another title'
-
-        obj = ObjectA(title=u'title', blurb='this is a blurb')
-        db.session.add(obj)
+    def test_add_entry(self):
+        db.session.add(ObjectA(title=u'title', blurb='this is a blurb'))
         db.session.commit()
+        self.assertEqual(ObjectA.query.whoosh_search('blurb').count(), 1)
 
-        self.assertEqual(len(list(ObjectA.query.whoosh_search('blurb'))), 1)
-        db.session.delete(obj)
+    def test_simple_search(self):
+        db.session.add(
+            ObjectA(
+                title=u'a slightly long title',
+                content=u'hello world'))
         db.session.commit()
+        self.assertEqual(ObjectA.query.whoosh_search('what').count(), 0)
+        self.assertEqual(ObjectA.query.whoosh_search(u'no match').count(), 0)
+        self.assertEqual(ObjectA.query.whoosh_search(u'title').count(), 1)
+        self.assertEqual(ObjectA.query.whoosh_search(u'hello').count(), 1)
 
-        db.session.add(ObjectA(title=title1, content=u'hello world', ignored=u'no match'))
-        db.session.commit()
-
-        self.assertEqual(len(list(ObjectA.query.whoosh_search('what'))), 0)
-        self.assertEqual(len(list(ObjectA.query.whoosh_search(u'no match'))), 0)
-        self.assertEqual(len(list(ObjectA.query.whoosh_search(u'title'))), 1)
-        self.assertEqual(len(list(ObjectA.query.whoosh_search(u'hello'))), 1)
-
+    def test_conflict_fails(self):
         db.session.add(ObjectB(title=u'my title', content=u'hello world'))
         db.session.commit()
 
         db.session.add(ObjectC(title=u'my title', content=u'hello world'))
         self.assertRaises(AttributeError, db.session.commit)
-        db.session.rollback()
 
+    def test_tables_dont_interfere(self):
+        db.session.add(
+            ObjectA(
+                title=u'a slightly long title',
+                content=u'hello world'))
+        db.session.add(ObjectB(title=u'what title', content=u'hello world'))
+        db.session.commit()
+        self.assertEqual(ObjectA.query.whoosh_search(u'what').count(), 0)
+        self.assertEqual(ObjectA.query.whoosh_search(u'title').count(), 1)
 
-        # make sure does not interfere with ObjectA's results
-        self.assertEqual(len(list(ObjectA.query.whoosh_search(u'what'))), 0)
-        self.assertEqual(len(list(ObjectA.query.whoosh_search(u'title'))), 1)
-        self.assertEqual(len(list(ObjectA.query.whoosh_search(u'hello'))), 1)
+        self.assertEqual(ObjectB.query.whoosh_search(u'what').count(), 1)
+        self.assertEqual(ObjectB.query.whoosh_search(u'title').count(), 1)
 
-        self.assertEqual(len(list(ObjectB.query.whoosh_search(u'what'))), 0)
-        self.assertEqual(len(list(ObjectB.query.whoosh_search(u'title'))), 1)
-        self.assertEqual(len(list(ObjectB.query.whoosh_search(u'hello'))), 1)
+    def test_search_multiple_rows(self):
+        db.session.add(
+            ObjectA(
+                title=u'a slightly long title',
+                content=u'hello world'))
+        db.session.add(
+            ObjectA(title='another title', content=u'a different message'))
+        db.session.add(
+            ObjectA(
+                title="ceci n'est pas un titre",
+                content='yet another message'))
+        db.session.commit()
+        self.assertEqual(ObjectA.query.whoosh_search(u'title').count(), 2)
+
+    def bad_all(self):
+        title1 = u'a slightly long title'
+        title2 = u'another title'
+        title3 = u'wow another title'
 
         obj2 = ObjectA(title=title2, content=u'a different message')
         db.session.add(obj2)
