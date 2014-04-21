@@ -252,7 +252,7 @@ def _after_flush(app, changes):
                 change[0]))
 
     if sys.version < '3':
-        iter = btype.iteritems
+        iter = bytype.iteritems
     else:
         iter = bytype.items
     for model, values in iter():

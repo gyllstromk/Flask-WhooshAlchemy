@@ -99,7 +99,7 @@ class Tests(TestCase):
         db.session.commit()
 
     def test_add_entry(self):
-        db.session.add(ObjectA(title=u'title', blurb='this is a blurb'))
+        db.session.add(ObjectA(title=u'title', blurb=u'this is a blurb'))
         db.session.commit()
         self.assertEqual(ObjectA.query.whoosh_search('blurb').count(), 1)
 
