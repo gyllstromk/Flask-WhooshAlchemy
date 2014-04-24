@@ -42,18 +42,15 @@ class _QueryProxy(flask_sqlalchemy.BaseQuery):
     # thing this proxy does is override the __iter__ method so that results are
     # returned in the order of the whoosh score to reflect text-based ranking.
 
-    def __init__(self, query_obj, primary_key_name, whoosh_searcher, model):
+    def __init__(self, entities, session=None):
+        super(_QueryProxy, self).__init__(entities, session)
 
-        # Make this a pure copy of the original Query object.
-        self.__dict__ = query_obj.__dict__.copy()
-
-        self._primary_key_name = primary_key_name
-        self._whoosh_searcher = whoosh_searcher
-        self._modelclass = model
+        self._modelclass = self._mapper_zero().class_
+        self._primary_key_name = self._modelclass.whoosh_primary_key
+        self._whoosh_searcher = self._modelclass.pure_whoosh
 
         # Stores whoosh results from query. If ``None``, indicates that no
         # whoosh query was performed.
-
         self._whoosh_rank = None
 
     def __iter__(self):
@@ -102,7 +99,7 @@ class _QueryProxy(flask_sqlalchemy.BaseQuery):
         parameter to ``True``.
 
         '''
-
+            
         if not isinstance(query, unicode):
             query = unicode(query)
 
@@ -195,12 +192,13 @@ def _create_index(app, model):
         indx = whoosh.index.create_in(wi, schema)
 
     app.whoosh_indexes[model.__name__] = indx
-    searcher = _Searcher(primary_key, indx)
-    model.query = _QueryProxy(model.query, primary_key,
-            searcher, model)
 
-    model.pure_whoosh = searcher
+    model.pure_whoosh = _Searcher(primary_key, indx)
+    model.whoosh_primary_key = primary_key
 
+    # change the query class of this model to our own
+    model.query_class = _QueryProxy
+    
     return indx
 
 
