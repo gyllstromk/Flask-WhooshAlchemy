@@ -79,7 +79,7 @@ class Tests(TestCase):
     def tearDown(self):
         try:
             shutil.rmtree(self.app.config['WHOOSH_BASE'])
-        except OSError, e:
+        except OSError as e:
             if e.errno != 2:  # code 2 - no such file or directory
                 raise
 
@@ -125,6 +125,7 @@ class Tests(TestCase):
 
         db.session.add(ObjectC(title=u'my title', content=u'hello world'))
         self.assertRaises(AttributeError, db.session.commit)
+        db.session.close()  # TODO: The test fails without it, check [Fedorof]
         db.session.rollback()
 
 

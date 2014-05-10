@@ -36,6 +36,13 @@ __searchable__ = '__searchable__'
 
 DEFAULT_WHOOSH_INDEX_NAME = 'whoosh_index'
 
+# Adding Python 3.3 support
+try:
+    unicode
+except NameError:
+    unicode = str
+
+
 
 class _QueryProxy(flask_sqlalchemy.BaseQuery):
     # We're replacing the model's ``query`` field with this proxy. The main
@@ -236,7 +243,7 @@ def _after_flush(app, changes):
             bytype.setdefault(change[0].__class__.__name__, []).append((update,
                 change[0]))
 
-    for model, values in bytype.iteritems():
+    for model, values in bytype.items():
         index = whoosh_index(app, values[0][1].__class__)
         with index.writer() as writer:
             primary_field = values[0][1].pure_whoosh.primary_key_name
