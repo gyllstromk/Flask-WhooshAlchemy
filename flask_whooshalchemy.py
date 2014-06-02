@@ -206,6 +206,7 @@ def _get_whoosh_schema_and_primary_key(model):
     schema = {}
     primary = None
     searchable = set(model.__searchable__)
+    analyzer = getattr(model, "__analyzer__", StemmingAnalyzer())
     for field in model.__table__.columns:
         if field.primary_key:
             schema[field.name] = whoosh.fields.ID(stored=True, unique=True)
@@ -216,7 +217,7 @@ def _get_whoosh_schema_and_primary_key(model):
                     sqlalchemy.types.Unicode)):
 
             schema[field.name] = whoosh.fields.TEXT(
-                    analyzer=StemmingAnalyzer())
+                    analyzer=analyzer)
 
     return Schema(**schema), primary
 
