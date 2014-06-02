@@ -17,6 +17,7 @@ from flask import Flask
 from flask.ext.sqlalchemy import SQLAlchemy
 from flask.ext.testing import TestCase
 import flask.ext.whooshalchemy as wa
+from whoosh.analysis import StemmingAnalyzer, DoubleMetaphoneFilter
 
 import datetime
 import os
@@ -57,6 +58,11 @@ class ObjectB(db.Model, BlogishBlob):
 class ObjectC(db.Model, BlogishBlob):
     __tablename__ = 'objectC'
     __searchable__ = ['title', 'field_that_doesnt_exist']
+    
+class ObjectD(db.Model, BlogishBlob):
+    __tablename__ = 'objectD'
+    __searchable__ = ['title']
+    __analyzer__ = StemmingAnalyzer() | DoubleMetaphoneFilter()
 
 
 class Tests(TestCase):
@@ -275,6 +281,17 @@ class Tests(TestCase):
 #         self.assertEqual(len(old), 1)
 #         self.assertEqual(old[0].title, a.title)
 
+        db.drop_all()
+        db.create_all()
+        
+        db.session.add(ObjectD(title=u"Travelling", content=u"Stemming"))
+        db.session.add(ObjectD(title=u"travel", content=u"Unstemmed and normal"))
+        db.session.add(ObjectD(title=u"trevel", content=u"Mispelt"))
+        
+        # When mispelt on either the indexed side or the query side, they should all return 3 due to the DoubleMetaphoneFilter
+        self.assertEqual(len(list(ObjectD.query.whoosh_search("travelling"))), 3)
+        self.assertEquals(len(list(ObjectD.query.whoosh_search("trovel"))), 3)
+ 
 
 if __name__ == '__main__':
     import unittest
