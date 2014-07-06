@@ -22,6 +22,7 @@ import sqlalchemy
 from whoosh.qparser import OrGroup
 from whoosh.qparser import AndGroup
 from whoosh.qparser import MultifieldParser
+from whoosh.query.qcore import Query
 from whoosh.analysis import StemmingAnalyzer
 import whoosh.index
 from whoosh.fields import Schema
@@ -35,6 +36,7 @@ __searchable__ = '__searchable__'
 
 
 DEFAULT_WHOOSH_INDEX_NAME = 'whoosh_index'
+UNICODE_TYPES = (sqlalchemy.types.Text, sqlalchemy.types.String, sqlalchemy.types.Unicode)
 
 
 class _QueryProxy(flask_sqlalchemy.BaseQuery):
@@ -100,7 +102,7 @@ class _QueryProxy(flask_sqlalchemy.BaseQuery):
 
         '''
             
-        if not isinstance(query, unicode):
+        if not isinstance(query, Query) and not isinstance(query, unicode):
             query = unicode(query)
 
         results = self._whoosh_searcher(query, limit, fields, or_)
@@ -145,10 +147,12 @@ class _Searcher(object):
         if fields is None:
             fields = self._all_fields
 
-        group = OrGroup if or_ else AndGroup
-        parser = MultifieldParser(fields, self._index.schema, group=group)
-        return self._index.searcher().search(parser.parse(query),
-                limit=limit)
+        if not isinstance(query, Query):
+            group = OrGroup if or_ else AndGroup
+            parser = MultifieldParser(fields, self._index.schema, group=group)
+            query = parser.parse(query)
+
+        return self._index.searcher().search(query, limit=limit)
 
 
 def whoosh_index(app, model):
@@ -205,18 +209,20 @@ def _create_index(app, model):
 def _get_whoosh_schema_and_primary_key(model):
     schema = {}
     primary = None
-    searchable = set(model.__searchable__)
     for field in model.__table__.columns:
         if field.primary_key:
             schema[field.name] = whoosh.fields.ID(stored=True, unique=True)
             primary = field.name
 
-        if field.name in searchable and isinstance(field.type,
-                (sqlalchemy.types.Text, sqlalchemy.types.String,
-                    sqlalchemy.types.Unicode)):
-
-            schema[field.name] = whoosh.fields.TEXT(
-                    analyzer=StemmingAnalyzer())
+    for item in model.__searchable__:
+        if isinstance(item, tuple):
+            key, field = item
+        else:
+            key = item
+            field = whoosh.fields.TEXT(analyzer=StemmingAnalyzer())
+        if key == primary:
+            continue
+        schema[key] = field
 
     return Schema(**schema), primary
 
@@ -229,34 +235,43 @@ def _after_flush(app, changes):
     # model.
 
     bytype = {}  # sort changes by type so we can use per-model writer
-    for change in changes:
-        update = change[1] in ('update', 'insert')
+    for obj, operation in changes:
+        if hasattr(obj.__class__, __searchable__):
+            bytype.setdefault(obj.__class__, []).append((obj, operation))
 
-        if hasattr(change[0].__class__, __searchable__):
-            bytype.setdefault(change[0].__class__.__name__, []).append((update,
-                change[0]))
-
-    for model, values in bytype.iteritems():
-        index = whoosh_index(app, values[0][1].__class__)
+    for cls, values in bytype.iteritems():
+        index = whoosh_index(app, cls)
         with index.writer() as writer:
-            primary_field = values[0][1].pure_whoosh.primary_key_name
-            searchable = values[0][1].__searchable__
+            primary_field = cls.pure_whoosh.primary_key_name
+            searchable = cls.__searchable__
 
-            for update, v in values:
-                if update:
+            for obj, operation in values:
+                if operation in ('update', 'insert'):
                     attrs = {}
-                    for key in searchable:
+                    for item in searchable:
+                        if isinstance(item, tuple):
+                            key, field = item
+                        else:
+                            key = item
+                            field = None
                         try:
-                            attrs[key] = unicode(getattr(v, key))
+                            value = getattr(obj, key)
                         except AttributeError:
                             raise AttributeError('{0} does not have {1} field {2}'
-                                    .format(model, __searchable__, key))
+                                    .format(cls.__name__, __searchable__, key))
+                        if callable(value):
+                            value = value()
 
-                    attrs[primary_field] = unicode(getattr(v, primary_field))
+                        if field is None or field.__class__ in UNICODE_TYPES:
+                            value = unicode(value)
+
+                        attrs[key] = value
+
+                    attrs[primary_field] = unicode(getattr(obj, primary_field))
+                    #print "update_document", attrs
                     writer.update_document(**attrs)
-                else:
-                    writer.delete_by_term(primary_field, unicode(getattr(v,
-                        primary_field)))
+                elif operation == 'delete':
+                    writer.delete_by_term(primary_field, unicode(getattr(obj, primary_field)))
 
 
 flask_sqlalchemy.models_committed.connect(_after_flush)

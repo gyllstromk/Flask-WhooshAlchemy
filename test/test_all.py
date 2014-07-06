@@ -14,6 +14,7 @@
 from __future__ import absolute_import
 
 from flask import Flask
+from flask import render_template
 from flask.ext.sqlalchemy import SQLAlchemy
 from flask.ext.testing import TestCase
 import flask.ext.whooshalchemy as wa
@@ -22,6 +23,7 @@ import datetime
 import os
 import tempfile
 import shutil
+import whoosh
 
 
 db = SQLAlchemy()
@@ -59,6 +61,28 @@ class ObjectC(db.Model, BlogishBlob):
     __searchable__ = ['title', 'field_that_doesnt_exist']
 
 
+class ObjectD(db.Model, BlogishBlob):
+    __tablename__ = 'objectD'
+    __searchable__ = [
+        'title', 
+        'blurb', 
+        'url',
+        ('created', whoosh.fields.DATETIME(stored=True, sortable=True))
+    ]
+
+    @property
+    def url(self):
+        return '/blog/%s' % self.id
+
+
+class ObjectE(db.Model, BlogishBlob):
+    __tablename__ = 'ObjectE'
+    __searchable__ = ['get_search_content']
+
+    def get_search_content(self):
+        return render_template('object_e_search.txt', object=self)
+
+
 class Tests(TestCase):
     DATABASE_URL = 'sqlite://'
     TESTING = True
@@ -85,6 +109,12 @@ class Tests(TestCase):
 
         db.drop_all()
 
+    def assert_search_result(self, model, *args, **kwargs):
+        return self.assertEqual(len(list(model.query.whoosh_search(*args, **kwargs))), 1)
+
+    def assert_search_no_result(self, model, *args, **kwargs):
+        return self.assertEqual(len(list(model.query.whoosh_search(*args, **kwargs))), 0)
+
     def test_flask_fail(self):
         # XXX This fails due to a bug in Flask-SQLAlchemy that affects
         # Flask-WhooshAlchemy. I submitted a pull request with a fix that is
@@ -98,6 +128,35 @@ class Tests(TestCase):
         db.session.add(ObjectA(title=u'a title', content=u'hello world'))
         db.session.flush()
         db.session.commit()
+
+    def test_custom_fields(self):
+        obj = ObjectD(title=u'title', blurb='this is a blurb')
+        db.session.add(obj)
+        db.session.commit()
+
+        self.assert_search_result(ObjectD, 'blurb') 
+        self.assert_search_result(ObjectD, '/blog/%s' % obj.id, fields=['url'])
+
+        ### Date ###
+        from whoosh.qparser import QueryParser
+        from whoosh.qparser.dateparse import DateParserPlugin
+
+        # Instatiate a query parser / add the DateParserPlugin to the parser
+        qp = QueryParser("date", ObjectD.pure_whoosh._index.schema)
+        qp.add_plugin(DateParserPlugin())
+
+        self.assert_search_result(ObjectD, qp.parse("created:today"))
+
+        self.assert_search_no_result(ObjectD, 'what')        # Sanity check
+
+    def test_callable_fields(self):
+        obj = ObjectE(title=u'title', blurb='this is a blurb')
+        db.session.add(obj)
+        db.session.commit()
+
+        self.assert_search_result(ObjectE, 'title')
+        self.assert_search_result(ObjectE, 'TEMPLATED')
+        self.assert_search_no_result(ObjectE, 'blurb')
 
     def test_all(self):
         title1 = u'a slightly long title'
