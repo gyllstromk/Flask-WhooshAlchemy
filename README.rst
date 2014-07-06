@@ -114,12 +114,12 @@ Except for the primary key, every field is given the default whoosh field of ``w
 Property and Function Fields
 -------------------------------
 
-Fields can also be properties on the model object or anything else that can be accessed by getattr(model, fieldname).  If it returns a callable object, the result of that call will be stored.  Here we add an 'url' index and we also call a template to render the content we want to store.  This is an easy way to do something similar to django_haystack.
+Fields can also be properties on the model object or anything else that can be accessed by getattr(model, fieldname).  If it returns a callable object, the result of that call will be stored.  Here we add an 'get_search_content', adding a template to render the content we want to store.  This is an easy way to do something similar to django_haystack.
 
 ::
     class BlogPost(db.Model):
       __tablename__ = 'blogpost'
-      __searchable__ = ['url', 'get_search_content']
+      __searchable__ = ['get_search_content']
 
       id = app.db.Column(app.db.Integer, primary_key=True)
       title = app.db.Column(app.db.Unicode)  # Indexed fields are either String,
