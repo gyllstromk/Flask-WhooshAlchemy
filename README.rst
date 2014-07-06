@@ -97,6 +97,7 @@ Customizing Whoosh Field Types
 Except for the primary key, every field is given the default whoosh field of ``whoosh.fields.TEXT(analyzer=whoosh.analysis.StemmingAnalyzer())`` unless you specify otherwise, by making the field added to __searchable__ as a tuple in the form of ``(name, field)`` like so:
 
 ::
+
     class BlogPost(db.Model):
       __tablename__ = 'blogpost'
       __searchable__ = [
@@ -117,6 +118,7 @@ Property and Function Fields
 Fields can also be properties on the model object or anything else that can be accessed by getattr(model, fieldname).  If it returns a callable object, the result of that call will be stored.  Here we add an 'get_search_content', adding a template to render the content we want to store.  This is an easy way to do something similar to django_haystack.
 
 ::
+
     class BlogPost(db.Model):
       __tablename__ = 'blogpost'
       __searchable__ = ['get_search_content']
@@ -135,6 +137,7 @@ Fields can also be properties on the model object or anything else that can be a
 
 
 ::
+
     # blog/post_search.txt
     {{ post.title }}
     {{ post.content }}
