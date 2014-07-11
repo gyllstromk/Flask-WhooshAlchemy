@@ -227,7 +227,7 @@ def _get_whoosh_schema_and_primary_key(model):
     return Schema(**schema), primary
 
 
-def _after_flush(app, changes):
+def _before_flush(app, changes):
     # Any db updates go through here. We check if any of these models have
     # ``__searchable__`` fields, indicating they need to be indexed. With these
     # we update the whoosh index for the model. If no index exists, it will be
@@ -274,7 +274,7 @@ def _after_flush(app, changes):
                     writer.delete_by_term(primary_field, unicode(getattr(obj, primary_field)))
 
 
-flask_sqlalchemy.models_committed.connect(_after_flush)
+flask_sqlalchemy.before_models_committed.connect(_before_flush)
 
 
 # def init_app(db):
