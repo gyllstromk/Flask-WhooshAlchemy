@@ -71,7 +71,6 @@ class _QueryProxy(flask_sqlalchemy.BaseQuery):
         for row in super_iter:
             # Push items onto heap, where sort value is the rank provided by
             # Whoosh
-
             heapq.heappush(ordered_by_whoosh_rank,
                 (self._whoosh_rank[unicode(getattr(row,
                     self._primary_key_name))], row))
@@ -227,12 +226,16 @@ def _get_whoosh_schema_and_primary_key(model):
     return Schema(**schema), primary
 
 
-def _before_flush(app, changes):
+@sqlalchemy.event.listens_for(flask_sqlalchemy.SignallingSession, "after_flush")
+def _store(session, context):
     # Any db updates go through here. We check if any of these models have
     # ``__searchable__`` fields, indicating they need to be indexed. With these
     # we update the whoosh index for the model. If no index exists, it will be
     # created here; this could impose a penalty on the initial commit of a
     # model.
+
+    app = session.app
+    changes = session._model_changes.values()
 
     bytype = {}  # sort changes by type so we can use per-model writer
     for obj, operation in changes:
@@ -273,8 +276,7 @@ def _before_flush(app, changes):
                 elif operation == 'delete':
                     writer.delete_by_term(primary_field, unicode(getattr(obj, primary_field)))
 
-
-flask_sqlalchemy.before_models_committed.connect(_before_flush)
+#flask_sqlalchemy.models_committed.connect(_store)
 
 
 # def init_app(db):
