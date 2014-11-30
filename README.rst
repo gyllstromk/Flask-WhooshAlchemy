@@ -41,6 +41,8 @@ Let's set up the environment and create our model:
       title = app.db.Column(app.db.Unicode)  # Indexed fields are either String,
       content = app.db.Column(app.db.Text)   # Unicode, or Text
       created = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+    
+    flask.ext.whooshalchemy.whoosh_index(app, BlogPost)
 
 Only two steps to get started:
 
