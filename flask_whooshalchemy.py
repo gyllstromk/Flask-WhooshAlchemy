@@ -164,6 +164,16 @@ def whoosh_index(app, model):
     return app.whoosh_indexes.get(model.__name__,
                 _create_index(app, model))
 
+def _get_analyzer(app, model):
+    analyzer = getattr(model, '__analyzer__', None)
+
+    if not analyzer and app.config.get('WHOOSH_ANALYZER'):
+        analyzer = app.config['WHOOSH_ANALYZER']
+
+    if not analyzer:
+        analyzer = StemmingAnalyzer()
+
+    return analyzer
 
 def _create_index(app, model):
     # a schema is created based on the fields of the model. Currently we only
@@ -182,10 +192,7 @@ def _create_index(app, model):
     wi = os.path.join(app.config.get('WHOOSH_BASE'),
             model.__name__)
 
-    if not app.config.get('WHOOSH_ANALYZER'):
-        app.config['WHOOSH_ANALYZER'] = StemmingAnalyzer()
-    analyzer = app.config['WHOOSH_ANALYZER']
-
+    analyzer = _get_analyzer(app, model)
     schema, primary_key = _get_whoosh_schema_and_primary_key(model, analyzer)
 
     if whoosh.index.exists_in(wi):
@@ -206,11 +213,11 @@ def _create_index(app, model):
     return indx
 
 
-def _get_whoosh_schema_and_primary_key(model, analyzer=StemmingAnalyzer()):
+def _get_whoosh_schema_and_primary_key(model, analyzer):
     schema = {}
     primary = None
     searchable = set(model.__searchable__)
-    analyzer = getattr(model, "__analyzer__", StemmingAnalyzer())
+
     for field in model.__table__.columns:
         if field.primary_key:
             schema[field.name] = whoosh.fields.ID(stored=True, unique=True)
