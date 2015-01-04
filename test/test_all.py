@@ -256,12 +256,6 @@ class Tests(TestCase):
                 2)
 
 
-#         self.assertEqual(len(recent), 1)
-#         self.assertEqual(recent[0].title, b.title)
-#         old = list(ObjectA.search_query(u'good').filter(ObjectA.created <= datetime.date.today() - datetime.timedelta(1)))
-#         self.assertEqual(len(old), 1)
-#         self.assertEqual(old[0].title, a.title)
- 
     def test_invalid_attribute(self):
         db.session.add(ObjectC(title=u'my title', content=u'hello world'))
         self.assertRaises(AttributeError, db.session.commit)

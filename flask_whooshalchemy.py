@@ -271,11 +271,3 @@ def _after_flush(app, changes):
 
 
 flask_sqlalchemy.models_committed.connect(_after_flush)
-
-
-# def init_app(db):
-#     app = db.get_app()
-# #    for table in db.get_tables_for_bind():
-#     for item in globals():
-# 
-#        #_create_index(app, table)
