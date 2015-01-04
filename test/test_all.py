@@ -91,20 +91,6 @@ class Tests(TestCase):
 
         db.drop_all()
 
-    def test_flask_fail(self):
-        # XXX This fails due to a bug in Flask-SQLAlchemy that affects
-        # Flask-WhooshAlchemy. I submitted a pull request with a fix that is
-        # pending.
-
-        from flask.ext.sqlalchemy import before_models_committed, models_committed
-        
-        before_models_committed.connect(_after_flush)
-        models_committed.connect(_after_flush)
-        db.session.add(ObjectB(title=u'my title', content=u'hello world'))
-        db.session.add(ObjectA(title=u'a title', content=u'hello world'))
-        db.session.flush()
-        db.session.commit()
-
     def test_all(self):
         title1 = u'a slightly long title'
         title2 = u'another title'
@@ -128,11 +114,6 @@ class Tests(TestCase):
 
         db.session.add(ObjectB(title=u'my title', content=u'hello world'))
         db.session.commit()
-
-        db.session.add(ObjectC(title=u'my title', content=u'hello world'))
-        self.assertRaises(AttributeError, db.session.commit)
-        db.session.rollback()
-
 
         # make sure does not interfere with ObjectA's results
         self.assertEqual(len(list(ObjectA.query.whoosh_search(u'what'))), 0)
@@ -292,6 +273,25 @@ class Tests(TestCase):
         self.assertEqual(len(list(ObjectD.query.whoosh_search("travelling"))), 3)
         self.assertEquals(len(list(ObjectD.query.whoosh_search("trovel"))), 3)
  
+    def test_invalid_attribute(self):
+        db.session.add(ObjectC(title=u'my title', content=u'hello world'))
+        self.assertRaises(AttributeError, db.session.commit)
+
+    def test_default_analyzer(self):
+        db.session.add(ObjectA(title=u'jumping', content=u''))
+        db.session.commit()
+        assert ['jumping'] == [obj.title for obj in ObjectA.query.whoosh_search(u'jump')]
+
+    def test_custom_analyzer(self):
+        from whoosh.analysis import SimpleAnalyzer
+        self.app.config['WHOOSH_ANALYZER'] = SimpleAnalyzer()
+        db.init_app(self.app)
+        db.create_all()
+        db.session.add(ObjectA(title=u'jumping', content=u''))
+        db.session.commit()
+        assert not list(ObjectA.query.whoosh_search(u'jump'))
+        assert ['jumping'] == [obj.title for obj in ObjectA.query.whoosh_search(u'jumping')]
+
 
 if __name__ == '__main__':
     import unittest
