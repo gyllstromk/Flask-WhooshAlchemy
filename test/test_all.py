@@ -260,6 +260,21 @@ class Tests(TestCase):
         db.session.add(ObjectC(title=u'my title', content=u'hello world'))
         self.assertRaises(AttributeError, db.session.commit)
 
+    def test_default_analyzer(self):
+        db.session.add(ObjectA(title=u'jumping', content=u''))
+        db.session.commit()
+        assert ['jumping'] == [obj.title for obj in ObjectA.query.whoosh_search(u'jump')]
+
+    def test_custom_analyzer(self):
+        from whoosh.analysis import SimpleAnalyzer
+        self.app.config['WHOOSH_ANALYZER'] = SimpleAnalyzer()
+        db.init_app(self.app)
+        db.create_all()
+        db.session.add(ObjectA(title=u'jumping', content=u''))
+        db.session.commit()
+        assert not list(ObjectA.query.whoosh_search(u'jump'))
+        assert ['jumping'] == [obj.title for obj in ObjectA.query.whoosh_search(u'jumping')]
+
 
 if __name__ == '__main__':
     import unittest
