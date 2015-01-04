@@ -85,20 +85,6 @@ class Tests(TestCase):
 
         db.drop_all()
 
-    def test_flask_fail(self):
-        # XXX This fails due to a bug in Flask-SQLAlchemy that affects
-        # Flask-WhooshAlchemy. I submitted a pull request with a fix that is
-        # pending.
-
-        from flask.ext.sqlalchemy import before_models_committed, models_committed
-        
-        before_models_committed.connect(_after_flush)
-        models_committed.connect(_after_flush)
-        db.session.add(ObjectB(title=u'my title', content=u'hello world'))
-        db.session.add(ObjectA(title=u'a title', content=u'hello world'))
-        db.session.flush()
-        db.session.commit()
-
     def test_all(self):
         title1 = u'a slightly long title'
         title2 = u'another title'
@@ -122,11 +108,6 @@ class Tests(TestCase):
 
         db.session.add(ObjectB(title=u'my title', content=u'hello world'))
         db.session.commit()
-
-        db.session.add(ObjectC(title=u'my title', content=u'hello world'))
-        self.assertRaises(AttributeError, db.session.commit)
-        db.session.rollback()
-
 
         # make sure does not interfere with ObjectA's results
         self.assertEqual(len(list(ObjectA.query.whoosh_search(u'what'))), 0)
@@ -274,6 +255,10 @@ class Tests(TestCase):
 #         old = list(ObjectA.search_query(u'good').filter(ObjectA.created <= datetime.date.today() - datetime.timedelta(1)))
 #         self.assertEqual(len(old), 1)
 #         self.assertEqual(old[0].title, a.title)
+
+    def test_invalid_attribute(self):
+        db.session.add(ObjectC(title=u'my title', content=u'hello world'))
+        self.assertRaises(AttributeError, db.session.commit)
 
 
 if __name__ == '__main__':
