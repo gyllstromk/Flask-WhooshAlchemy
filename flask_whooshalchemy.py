@@ -58,8 +58,10 @@ class _QueryProxy(flask_sqlalchemy.BaseQuery):
 
         super_iter = super(_QueryProxy, self).__iter__()
 
-        if self._whoosh_rank is None:
-            # Whoosh search hasn't been run so behave as normal.
+        if self._whoosh_rank is None or self._order_by is not False:
+            # Whoosh search hasn't been run or caller has explicitly asked
+            # for results to be sorted, so behave as normal (no Whoosh
+            # relevance score sorting).
 
             return super_iter
 
