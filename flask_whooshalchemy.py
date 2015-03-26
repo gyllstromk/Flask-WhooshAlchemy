@@ -208,11 +208,13 @@ def _create_index(app, model):
     model.whoosh_primary_key = primary_key
 
     # change the query class of this model to our own
-    multiplied_query_class = type(
-        'MultipliedQuery', (model.query_class, _QueryProxy), {}
-    )
-    model.query_class = multiplied_query_class
-    
+    if model.query_class is not flask_sqlalchemy.BaseQuery:
+        model.query_class = type(
+            'MultipliedQuery', (model.query_class, _QueryProxy), {}
+        )
+    else:
+        model.query_class = _QueryProxy
+
     return indx
 
 
