@@ -99,7 +99,7 @@ class _QueryProxy(flask_sqlalchemy.BaseQuery):
         parameter to ``True``.
 
         '''
-            
+
         if not isinstance(query, unicode):
             query = unicode(query)
 
@@ -208,7 +208,10 @@ def _create_index(app, model):
     model.whoosh_primary_key = primary_key
 
     # change the query class of this model to our own
-    model.query_class = _QueryProxy
+    multiplied_query_class = type(
+        'MultipliedQuery', (model.query_class, _QueryProxy), {}
+    )
+    model.query_class = multiplied_query_class
     
     return indx
 
