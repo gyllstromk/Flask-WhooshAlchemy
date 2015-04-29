@@ -27,10 +27,13 @@ Let's set up the environment and create our model:
 
 ::
 
+    from whoosh.analysis import StemmingAnalyzer
     import flask.ext.whooshalchemy
 
     # set the location for the whoosh index
     app.config['WHOOSH_BASE'] = 'path/to/whoosh/base'
+    # set the global analyzer, defaults to StemmingAnalyzer.
+    app.config['WHOOSH_ANALYZER'] = StemmingAnalyzer()
 
 
     class BlogPost(db.Model):
@@ -44,10 +47,14 @@ Let's set up the environment and create our model:
       content = app.db.Column(app.db.Text)   # Unicode, or Text
       created = db.Column(db.DateTime, default=datetime.datetime.utcnow)
 
-Only two steps to get started:
+Only four steps to get started:
+
+(Actually, only the third one is required for using, others are all optional.)
 
 1) Set the ``WHOOSH_BASE`` to the path for the whoosh index. If not set, it will default to a directory called 'whoosh_index' in the directory from which the application is run.
-2) Add a ``__searchable__`` field to the model which specifies the fields (as ``str`` s) to be indexed .
+2) Set the ``WHOOSH_ANALYZER`` to the global analyzer. If not set, it will defalt to ``StemmingAnalyzer``.
+3) Add a ``__searchable__`` field to the model which specifies the fields (as ``str`` s) to be indexed .
+4) Add a ``__analyzer__`` field to the model if you need a local custom analyzer for indexing.
 
 Let's create a post:
 
