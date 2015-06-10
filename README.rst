@@ -27,7 +27,7 @@ Let's set up the environment and create our model:
 
 ::
 
-    import flask.ext.whooshalchemy
+    import flask.ext.whooshalchemy as whooshalchemy
 
     # set the location for the whoosh index
     app.config['WHOOSH_BASE'] = 'path/to/whoosh/base'
@@ -43,6 +43,8 @@ Let's set up the environment and create our model:
       title = app.db.Column(app.db.Unicode)  # Indexed fields are either String,
       content = app.db.Column(app.db.Text)   # Unicode, or Text
       created = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+     
+    whooshalchemy.whoosh_index(app, BlogPost)
 
 Only two steps to get started:
 
