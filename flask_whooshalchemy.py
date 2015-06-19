@@ -63,16 +63,22 @@ class _QueryProxy(flask_sqlalchemy.BaseQuery):
 
             return super_iter
 
+        super_rows = list(super_iter)
+
         # Iterate through the values and re-order by whoosh relevance.
         ordered_by_whoosh_rank = []
 
-        for row in super_iter:
+        for row in super_rows:
             # Push items onto heap, where sort value is the rank provided by
             # Whoosh
 
-            heapq.heappush(ordered_by_whoosh_rank,
-                (self._whoosh_rank[unicode(getattr(row,
-                    self._primary_key_name))], row))
+            if hasattr(row, self._primary_key_name):
+                heapq.heappush(ordered_by_whoosh_rank,
+                    (self._whoosh_rank[unicode(getattr(row,
+                        self._primary_key_name))], row))
+            else:
+                # PK column not found in result row
+                return iter(super_rows)
 
         def _inner():
             while ordered_by_whoosh_rank:
