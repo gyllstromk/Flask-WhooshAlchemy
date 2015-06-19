@@ -11,7 +11,7 @@ import os
 
 setup(
     name='Flask-WhooshAlchemy-Redux',
-    version='0.6.1',
+    version='0.6.2',
     url='https://github.com/dhamaniasad/Flask-WhooshAlchemy',
     license='BSD',
     author='Asad Dhamani',
