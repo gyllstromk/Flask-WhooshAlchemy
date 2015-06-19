@@ -11,11 +11,11 @@ import os
 
 setup(
     name='Flask-WhooshAlchemy',
-    version='0.6',
-    url='https://github.com/gyllstromk/Flask-WhooshAlchemy',
+    version='0.6.1',
+    url='https://github.com/dhamaniasad/Flask-WhooshAlchemy',
     license='BSD',
-    author='Karl Gyllstrom',
-    author_email='karl.gyllstrom+code@gmail.com',
+    author='Asad Dhamani',
+    author_email='dhamaniasad+code@gmail.com',
     description='Whoosh extension to Flask/SQLAlchemy',
     long_description=open(os.path.join(os.path.dirname(__file__), 'README.rst')).read(),
 
