@@ -164,6 +164,16 @@ def whoosh_index(app, model):
     return app.whoosh_indexes.get(model.__name__,
                 _create_index(app, model))
 
+def _get_analyzer(app, model):
+    analyzer = getattr(model, '__analyzer__', None)
+
+    if not analyzer and app.config.get('WHOOSH_ANALYZER'):
+        analyzer = app.config['WHOOSH_ANALYZER']
+
+    if not analyzer:
+        analyzer = StemmingAnalyzer()
+
+    return analyzer
 
 def _create_index(app, model):
     # a schema is created based on the fields of the model. Currently we only
@@ -182,7 +192,8 @@ def _create_index(app, model):
     wi = os.path.join(app.config.get('WHOOSH_BASE'),
             model.__name__)
 
-    schema, primary_key = _get_whoosh_schema_and_primary_key(model)
+    analyzer = _get_analyzer(app, model)
+    schema, primary_key = _get_whoosh_schema_and_primary_key(model, analyzer)
 
     if whoosh.index.exists_in(wi):
         indx = whoosh.index.open_dir(wi)
@@ -202,10 +213,11 @@ def _create_index(app, model):
     return indx
 
 
-def _get_whoosh_schema_and_primary_key(model):
+def _get_whoosh_schema_and_primary_key(model, analyzer):
     schema = {}
     primary = None
     searchable = set(model.__searchable__)
+
     for field in model.__table__.columns:
         if field.primary_key:
             schema[field.name] = whoosh.fields.ID(stored=True, unique=True)
@@ -215,8 +227,7 @@ def _get_whoosh_schema_and_primary_key(model):
                 (sqlalchemy.types.Text, sqlalchemy.types.String,
                     sqlalchemy.types.Unicode)):
 
-            schema[field.name] = whoosh.fields.TEXT(
-                    analyzer=StemmingAnalyzer())
+            schema[field.name] = whoosh.fields.TEXT(analyzer=analyzer)
 
     return Schema(**schema), primary
 
@@ -260,11 +271,3 @@ def _after_flush(app, changes):
 
 
 flask_sqlalchemy.models_committed.connect(_after_flush)
-
-
-# def init_app(db):
-#     app = db.get_app()
-# #    for table in db.get_tables_for_bind():
-#     for item in globals():
-# 
-#        #_create_index(app, table)

@@ -17,6 +17,7 @@ from flask import Flask
 from flask.ext.sqlalchemy import SQLAlchemy
 from flask.ext.testing import TestCase
 import flask.ext.whooshalchemy as wa
+from whoosh.analysis import StemmingAnalyzer, DoubleMetaphoneFilter
 
 import datetime
 import os
@@ -57,6 +58,11 @@ class ObjectB(db.Model, BlogishBlob):
 class ObjectC(db.Model, BlogishBlob):
     __tablename__ = 'objectC'
     __searchable__ = ['title', 'field_that_doesnt_exist']
+    
+class ObjectD(db.Model, BlogishBlob):
+    __tablename__ = 'objectD'
+    __searchable__ = ['title']
+    __analyzer__ = StemmingAnalyzer() | DoubleMetaphoneFilter()
 
 
 class Tests(TestCase):
@@ -85,20 +91,6 @@ class Tests(TestCase):
 
         db.drop_all()
 
-    def test_flask_fail(self):
-        # XXX This fails due to a bug in Flask-SQLAlchemy that affects
-        # Flask-WhooshAlchemy. I submitted a pull request with a fix that is
-        # pending.
-
-        from flask.ext.sqlalchemy import before_models_committed, models_committed
-        
-        before_models_committed.connect(_after_flush)
-        models_committed.connect(_after_flush)
-        db.session.add(ObjectB(title=u'my title', content=u'hello world'))
-        db.session.add(ObjectA(title=u'a title', content=u'hello world'))
-        db.session.flush()
-        db.session.commit()
-
     def test_all(self):
         title1 = u'a slightly long title'
         title2 = u'another title'
@@ -122,11 +114,6 @@ class Tests(TestCase):
 
         db.session.add(ObjectB(title=u'my title', content=u'hello world'))
         db.session.commit()
-
-        db.session.add(ObjectC(title=u'my title', content=u'hello world'))
-        self.assertRaises(AttributeError, db.session.commit)
-        db.session.rollback()
-
 
         # make sure does not interfere with ObjectA's results
         self.assertEqual(len(list(ObjectA.query.whoosh_search(u'what'))), 0)
@@ -269,11 +256,33 @@ class Tests(TestCase):
                 2)
 
 
-#         self.assertEqual(len(recent), 1)
-#         self.assertEqual(recent[0].title, b.title)
-#         old = list(ObjectA.search_query(u'good').filter(ObjectA.created <= datetime.date.today() - datetime.timedelta(1)))
-#         self.assertEqual(len(old), 1)
-#         self.assertEqual(old[0].title, a.title)
+    def test_invalid_attribute(self):
+        db.session.add(ObjectC(title=u'my title', content=u'hello world'))
+        self.assertRaises(AttributeError, db.session.commit)
+
+    def test_default_analyzer(self):
+        db.session.add(ObjectA(title=u'jumping', content=u''))
+        db.session.commit()
+        assert ['jumping'] == [obj.title for obj in ObjectA.query.whoosh_search(u'jump')]
+
+    def test_custom_analyzer(self):
+        from whoosh.analysis import SimpleAnalyzer
+        self.app.config['WHOOSH_ANALYZER'] = SimpleAnalyzer()
+        db.init_app(self.app)
+        db.create_all()
+        db.session.add(ObjectA(title=u'jumping', content=u''))
+        db.session.commit()
+        assert not list(ObjectA.query.whoosh_search(u'jump'))
+        assert ['jumping'] == [obj.title for obj in ObjectA.query.whoosh_search(u'jumping')]
+
+        db.session.add(ObjectD(title=u'Travelling', content=u'Stemming'))
+        db.session.add(ObjectD(title=u'travel', content=u'Unstemmed and normal'))
+        db.session.add(ObjectD(title=u'trevel', content=u'Mispelt'))
+        
+        db.session.commit()
+        # When mispelt on either the indexed side or the query side, they should all return 3 due to the DoubleMetaphoneFilter
+        self.assertEqual(len(list(ObjectD.query.whoosh_search('travelling'))), 3)
+        self.assertEquals(len(list(ObjectD.query.whoosh_search('trovel'))), 3)
 
 
 if __name__ == '__main__':
