@@ -1,5 +1,5 @@
 """
-Flask-WhooshAlchemy
+Flask-WhooshAlchemy-Redux
 -------------
 
 Whoosh extension to Flask/SQLAlchemy
@@ -10,7 +10,7 @@ import os
 
 
 setup(
-    name='Flask-WhooshAlchemy',
+    name='Flask-WhooshAlchemy-Redux',
     version='0.6.1',
     url='https://github.com/dhamaniasad/Flask-WhooshAlchemy',
     license='BSD',

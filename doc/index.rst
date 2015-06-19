@@ -3,20 +3,20 @@ Welcome to Flask-WhooshAlchemy!
 
 Flask-WhooshAlchemy is a Flask extension that integrates the text-search functionality of `Whoosh <https://bitbucket.org/mchaput/whoosh/wiki/Home>`_ with the ORM of `SQLAlchemy <http://www.sqlalchemy.org/>`_ for use in `Flask <http://flask.pocoo.org/>`_ applications.
 
-Source code and issue tracking at `GitHub <http://github.com/gyllstromk/Flask-WhooshAlchemy>`_.
+Source code and issue tracking at `GitHub <http://github.com/dhamaniasad/Flask-WhooshAlchemy>`_.
 
 Install
 -------
 
 ::
 
-    pip install flask_whooshalchemy
+    pip install flask_whooshalchemy_redux
 
 Or:
 
 ::
     
-    git clone https://github.com/gyllstromk/Flask-WhooshAlchemy.git
+    git clone https://github.com/dhamaniasad/Flask-WhooshAlchemy.git
 
 Quickstart
 ----------
@@ -25,7 +25,7 @@ Let's set up the environment and create our model:
 
 ::
 
-    import flask.ext.whooshalchemy
+    import flask.ext.whooshalchemy as whooshalchemy
 
     # set the location for the whoosh index
     app.config['WHOOSH_BASE'] = 'path/to/whoosh/base'
@@ -39,6 +39,8 @@ Let's set up the environment and create our model:
       title = app.db.Column(app.db.Unicode)  # Indexed fields are either String,
       content = app.db.Column(app.db.Text)   # Unicode, or Text
       created = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+
+    whooshalchemy.whoosh_index(app, BlogPost)
 
 Only two steps to get started:
 
