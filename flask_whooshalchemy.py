@@ -228,6 +228,11 @@ def _get_whoosh_schema_and_primary_key(model, analyzer):
                     sqlalchemy.types.Unicode)):
 
             schema[field.name] = whoosh.fields.TEXT(analyzer=analyzer)
+            
+    for parent_class in model.__bases__:
+        for i in searchable:
+            if hasattr(parent_class, i):
+                schema[i] = whoosh.fields.TEXT(analyzer=analyzer)
 
     return Schema(**schema), primary
 
