@@ -23,6 +23,7 @@ from whoosh.qparser import OrGroup
 from whoosh.qparser import AndGroup
 from whoosh.qparser import MultifieldParser
 from whoosh.analysis import StemmingAnalyzer
+from whoosh.writing import AsyncWriter
 import whoosh.index
 from whoosh.fields import Schema
 #from whoosh.fields import ID, TEXT, KEYWORD, STORED
@@ -208,7 +209,8 @@ def _create_index(app, model):
     model.whoosh_primary_key = primary_key
 
     # change the query class of this model to our own
-    if model.query_class is not flask_sqlalchemy.BaseQuery:
+    if model.query_class is not flask_sqlalchemy.BaseQuery and model.query_class is not _QueryProxy:
+        print (model.query_class, _QueryProxy)
         model.query_class = type(
             'MultipliedQuery', (model.query_class, _QueryProxy), {}
         )
@@ -253,8 +255,8 @@ def _after_flush(app, changes):
                 change[0]))
 
     for model, values in bytype.iteritems():
-        index = whoosh_index(app, values[0][1].__class__)
-        with index.writer() as writer:
+        index = AsyncWriter(whoosh_index(app, values[0][1].__class__))
+        with index as writer:
             primary_field = values[0][1].pure_whoosh.primary_key_name
             searchable = values[0][1].__searchable__
 
