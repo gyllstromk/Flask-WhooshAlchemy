@@ -5,7 +5,6 @@ Flask-WhooshAlchemy is a Flask extension that integrates the text-search functio
 
 Source code and issue tracking at `GitHub <https://github.com/Revolution1/Flask-WhooshAlchemyPlus>`_.
 
-View the official docs at http://packages.python.org/Flask-WhooshAlchemy/.
 
 Install
 -------
@@ -48,6 +47,7 @@ Only two steps to get started:
 
 1) Set the ``WHOOSH_BASE`` to the path for the whoosh index. If not set, it will default to a directory called 'whoosh_index' in the directory from which the application is run.
 2) Add a ``__searchable__`` field to the model which specifies the fields (as ``str`` s) to be indexed .
+3) set ``WHOOSH_DISABLED`` to ``True`` to disable whoosh indexing .
 
 Let's create a post:
 
@@ -69,7 +69,7 @@ So if you want to index them manually:
 ::
 
     from flask_whooshalchemyplus import index_all
-    
+
     index_all(app)
 
 

@@ -5,7 +5,6 @@ Flask-WhooshAlchemy is a Flask extension that integrates the text-search functio
 
 Source code and issue tracking at `GitHub <https://github.com/Revolution1/Flask-WhooshAlchemyPlus>`_.
 
-View the official docs at http://packages.python.org/Flask-WhooshAlchemy/.
 
 Install
 -------
@@ -48,6 +47,7 @@ Only two steps to get started:
 
 1) Set the ``WHOOSH_BASE`` to the path for the whoosh index. If not set, it will default to a directory called 'whoosh_index' in the directory from which the application is run.
 2) Add a ``__searchable__`` field to the model which specifies the fields (as ``str`` s) to be indexed .
+3) set ``WHOOSH_DISABLED`` to ``True`` to disable whoosh indexing .
 
 Let's create a post:
 
@@ -67,9 +67,10 @@ By defualt records can be indexed only when the server is running.
 So if you want to index them manually:
 
 ::
-  from flask_whooshalchemyplus import index_all
 
-  index_all(app)
+    from flask_whooshalchemyplus import index_all
+
+    index_all(app)
 
 
 Text Searching
@@ -81,7 +82,7 @@ To execute a simple search:
 
     results = BlogPost.query.whoosh_search('cool')
 
-This will return all ``BlogPost`` instances in which at least one indexed field (i.e., 'title' or 'content') is a text match to the query. Results are ranked according to their relevance score, with the best match appearing first when iterating. The result of this call is a (subclass of) :class:`sqlalchemy.orm.query.Query` object, so you can chain other SQL operations. For example::
+This will return all ``BlogPost`` instances in which at least one indexed field (i.e., 'title' or 'content') is a text match to the query. Results are ranked according to their relevance score, with the best match appearing first when iterating. The result of this call is a (subclass of) ``sqlalchemy.orm.query.Query`` object, so you can chain other SQL operations. For example::
 
     two_days_ago = datetime.date.today() - datetime.timedelta(2)
     recent_matches = BlogPost.query.whoosh_search('first').filter(
