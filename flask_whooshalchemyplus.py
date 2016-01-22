@@ -60,21 +60,25 @@ class _QueryProxy(flask_sqlalchemy.BaseQuery):
 
         super_iter = super(_QueryProxy, self).__iter__()
 
-        if self._whoosh_rank is None:
-            # Whoosh search hasn't been run so behave as normal.
-
+        if self._whoosh_rank is None or self._order_by is not False:
+            # Whoosh search hasn't been run or caller has explicitly asked
+            # for results to be sorted, so behave as normal (no Whoosh
+            # relevance score sorting).
             return super_iter
 
         # Iterate through the values and re-order by whoosh relevance.
         ordered_by_whoosh_rank = []
 
-        for row in super_iter:
+        super_rows = list(super_iter)
+        for row in super_rows:
             # Push items onto heap, where sort value is the rank provided by
             # Whoosh
-
-            pk = unicode(getattr(row, self._primary_key_name))
-            heapq.heappush(ordered_by_whoosh_rank,
-                           (self._whoosh_rank[pk], row))
+            if hasattr(row, self._primary_key_name):
+                pk = unicode(getattr(row, self._primary_key_name))
+                heapq.heappush(ordered_by_whoosh_rank,
+                               (self._whoosh_rank[pk], row))
+            else:
+                return iter(super_rows)
 
         def _inner():
             while ordered_by_whoosh_rank:
