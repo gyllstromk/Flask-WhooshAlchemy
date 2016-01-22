@@ -27,6 +27,13 @@ from whoosh.qparser import AndGroup
 from whoosh.qparser import MultifieldParser
 from whoosh.qparser import OrGroup
 
+try:
+    unicode
+except NameError:
+    unicode = str
+
+__version__ = '0.7.1'
+
 __searchable__ = '__searchable__'
 
 DEFAULT_WHOOSH_INDEX_NAME = 'whoosh_index'
@@ -65,8 +72,9 @@ class _QueryProxy(flask_sqlalchemy.BaseQuery):
             # Push items onto heap, where sort value is the rank provided by
             # Whoosh
 
+            pk = unicode(getattr(row, self._primary_key_name))
             heapq.heappush(ordered_by_whoosh_rank,
-                           (self._whoosh_rank[unicode(getattr(row, self._primary_key_name))], row))
+                           (self._whoosh_rank[pk], row))
 
         def _inner():
             while ordered_by_whoosh_rank:
@@ -125,6 +133,7 @@ class _QueryProxy(flask_sqlalchemy.BaseQuery):
 
 
 class _Searcher(object):
+
     ''' Assigned to a Model class as ``pure_search``, which enables
     text-querying to whoosh hit list. Also used by ``query.whoosh_search``'''
 
@@ -224,7 +233,8 @@ def _get_whoosh_schema_and_primary_key(model, analyzer):
             primary = field.name
 
         if field.name in searchable and isinstance(field.type,
-                                                   (sqlalchemy.types.Text, sqlalchemy.types.String,
+                                                   (sqlalchemy.types.Text,
+                                                    sqlalchemy.types.String,
                                                     sqlalchemy.types.Unicode)):
             schema[field.name] = whoosh.fields.TEXT(analyzer=analyzer)
 
@@ -251,9 +261,10 @@ def _after_flush(app, changes):
         update = change[1] in ('update', 'insert')
 
         if hasattr(change[0].__class__, __searchable__):
-            bytype.setdefault(change[0].__class__.__name__, []).append((update, change[0]))
+            bytype.setdefault(change[0].__class__.__name__, []).append(
+                (update, change[0]))
 
-    for model, values in bytype.iteritems():
+    for model, values in bytype.items():
         index = whoosh_index(app, values[0][1].__class__)
         with index.writer() as writer:
             primary_field = values[0][1].pure_whoosh.primary_key_name
@@ -266,13 +277,15 @@ def _after_flush(app, changes):
                         try:
                             attrs[key] = unicode(getattr(v, key))
                         except AttributeError:
-                            raise AttributeError('{0} does not have {1} field {2}'
-                                                 .format(model, __searchable__, key))
+                            raise AttributeError(
+                                '{0} does not have {1} field {2}'
+                                .format(model, __searchable__, key))
 
                     attrs[primary_field] = unicode(getattr(v, primary_field))
                     writer.update_document(**attrs)
                 else:
-                    writer.delete_by_term(primary_field, unicode(getattr(v, primary_field)))
+                    writer.delete_by_term(
+                        primary_field, unicode(getattr(v, primary_field)))
 
 
 flask_sqlalchemy.models_committed.connect(_after_flush)
@@ -295,8 +308,9 @@ def index_all(app):
                     try:
                         attrs[key] = unicode(getattr(v, key))
                     except AttributeError:
-                        raise AttributeError('{0} does not have {1} field {2}'
-                                             .format(model, __searchable__, key))
+                        raise AttributeError(
+                            '{0} does not have {1} field {2}'
+                            .format(model, __searchable__, key))
                 attrs[primary_field] = unicode(getattr(v, primary_field))
                 writer.update_document(**attrs)
         print("done")

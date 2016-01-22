@@ -8,10 +8,11 @@ Whoosh extension to Flask/SQLAlchemy
 from setuptools import setup
 import os
 
+from flask_whooshalchemyplus import __version__ as VERSION
 
 setup(
     name='Flask-WhooshAlchemyPlus',
-    version='0.6',
+    version=VERSION,
     url='https://github.com/revolution1/Flask-WhooshAlchemyPlus',
     license='BSD',
     author='Revolution1',
