@@ -26,6 +26,7 @@ from whoosh.fields import Schema
 from whoosh.qparser import AndGroup
 from whoosh.qparser import MultifieldParser
 from whoosh.qparser import OrGroup
+from whoosh.writing import AsyncWriter
 
 try:
     unicode
@@ -221,7 +222,14 @@ def _create_index(app, model):
     model.whoosh_primary_key = primary_key
 
     # change the query class of this model to our own
-    model.query_class = _QueryProxy
+    if model.query_class is not flask_sqlalchemy.BaseQuery \
+            and model.query_class is not _QueryProxy:
+        print(model.query_class, _QueryProxy)
+        model.query_class = type(
+            'MultipliedQuery', (model.query_class, _QueryProxy), {}
+        )
+    else:
+        model.query_class = _QueryProxy
 
     return indx
 
@@ -270,7 +278,7 @@ def _after_flush(app, changes):
 
     for model, values in bytype.items():
         index = whoosh_index(app, values[0][1].__class__)
-        with index.writer() as writer:
+        with AsyncWriter(index) as writer:
             primary_field = values[0][1].pure_whoosh.primary_key_name
             searchable = values[0][1].__searchable__
 
