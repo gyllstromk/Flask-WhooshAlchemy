@@ -11,7 +11,7 @@ Install
 
 ::
 
-    pip install flask_whooshalchemyPlus
+    pip install flask_whooshalchemyplus
 
 Or:
 

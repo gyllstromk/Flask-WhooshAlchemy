@@ -20,7 +20,7 @@ setup(
     description='Whoosh extension to Flask/SQLAlchemy',
     long_description=open(os.path.join(os.path.dirname(__file__), 'README.rst')).read(),
 
-    py_modules=['Flask-WhooshAlchemyPlus'],
+    py_modules=['flask_whooshalchemyplus'],
     zip_safe=False,
     include_package_data=True,
     platforms='any',
