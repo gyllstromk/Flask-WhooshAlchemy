@@ -10,16 +10,16 @@ import os
 
 
 setup(
-    name='Flask-WhooshAlchemy',
+    name='Flask-WhooshAlchemyPlus',
     version='0.6',
-    url='https://github.com/gyllstromk/Flask-WhooshAlchemy',
+    url='https://github.com/revolution1/Flask-WhooshAlchemyPlus',
     license='BSD',
-    author='Karl Gyllstrom',
-    author_email='karl.gyllstrom+code@gmail.com',
+    author='Revolution1',
+    author_email='crj93106@gmail.com',
     description='Whoosh extension to Flask/SQLAlchemy',
     long_description=open(os.path.join(os.path.dirname(__file__), 'README.rst')).read(),
 
-    py_modules=['flask_whooshalchemy'],
+    py_modules=['Flask-WhooshAlchemyPlus'],
     zip_safe=False,
     include_package_data=True,
     platforms='any',

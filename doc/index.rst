@@ -3,20 +3,22 @@ Welcome to Flask-WhooshAlchemy!
 
 Flask-WhooshAlchemy is a Flask extension that integrates the text-search functionality of `Whoosh <https://bitbucket.org/mchaput/whoosh/wiki/Home>`_ with the ORM of `SQLAlchemy <http://www.sqlalchemy.org/>`_ for use in `Flask <http://flask.pocoo.org/>`_ applications.
 
-Source code and issue tracking at `GitHub <http://github.com/gyllstromk/Flask-WhooshAlchemy>`_.
+Source code and issue tracking at `GitHub <https://github.com/Revolution1/Flask-WhooshAlchemyPlus>`_.
+
+View the official docs at http://packages.python.org/Flask-WhooshAlchemy/.
 
 Install
 -------
 
 ::
 
-    pip install flask_whooshalchemy
+    pip install flask_whooshalchemyPlus
 
 Or:
 
 ::
-    
-    git clone https://github.com/gyllstromk/Flask-WhooshAlchemy.git
+
+    git clone https://github.com/Revolution1/Flask-WhooshAlchemyPlus.git
 
 Quickstart
 ----------
@@ -25,7 +27,7 @@ Let's set up the environment and create our model:
 
 ::
 
-    import flask.ext.whooshalchemy
+    import flask_whooshalchemyplus
 
     # set the location for the whoosh index
     app.config['WHOOSH_BASE'] = 'path/to/whoosh/base'
@@ -34,6 +36,8 @@ Let's set up the environment and create our model:
     class BlogPost(db.Model):
       __tablename__ = 'blogpost'
       __searchable__ = ['title', 'content']  # these fields will be indexed by whoosh
+      __analyzer__ = SimpleAnalyzer()        # configure analyzer; defaults to
+                                             # StemmingAnalyzer if not specified
 
       id = app.db.Column(app.db.Integer, primary_key=True)
       title = app.db.Column(app.db.Unicode)  # Indexed fields are either String,
@@ -54,6 +58,19 @@ Let's create a post:
     ); db.session.commit()
 
 After the session is committed, our new ``BlogPost`` is indexed. Similarly, if the post is deleted, it will be removed from the Whoosh index.
+
+
+Manually Indexing
+-----------------
+
+By defualt records can be indexed only when the server is running.
+So if you want to index them manually:
+
+::
+  from flask_whooshalchemyplus import index_all
+
+  index_all(app)
+
 
 Text Searching
 --------------
