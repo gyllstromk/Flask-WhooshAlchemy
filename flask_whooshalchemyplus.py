@@ -33,7 +33,7 @@ try:
 except NameError:
     unicode = str
 
-__version__ = '0.7.2'
+__version__ = '0.7.3'
 
 __searchable__ = '__searchable__'
 
@@ -247,14 +247,14 @@ def _get_whoosh_schema_and_primary_key(model, analyzer):
                                                    (sqlalchemy.types.Text,
                                                     sqlalchemy.types.String,
                                                     sqlalchemy.types.Unicode)):
-            schema[field.name] = whoosh.fields.TEXT(analyzer=analyzer)
+            schema[field.name] = whoosh.fields.TEXT(analyzer=analyzer, vector=True)
 
     for parent_class in model.__bases__:
         if hasattr(parent_class, "_sa_class_manager"):
             if parent_class.__searchable__:
                 for i in set(parent_class.__searchable__):
                     if hasattr(parent_class, i):
-                        schema[i] = whoosh.fields.TEXT(analyzer=analyzer)
+                        schema[i] = whoosh.fields.TEXT(analyzer=analyzer, vector=True)
 
     return Schema(**schema), primary
 
