@@ -33,7 +33,7 @@ try:
 except NameError:
     unicode = str
 
-__version__ = '0.7.1'
+__version__ = '0.7.2'
 
 __searchable__ = '__searchable__'
 
@@ -138,7 +138,6 @@ class _QueryProxy(flask_sqlalchemy.BaseQuery):
 
 
 class _Searcher(object):
-
     ''' Assigned to a Model class as ``pure_search``, which enables
     text-querying to whoosh hit list. Also used by ``query.whoosh_search``'''
 
@@ -291,7 +290,7 @@ def _after_flush(app, changes):
                         except AttributeError:
                             raise AttributeError(
                                 '{0} does not have {1} field {2}'
-                                .format(model, __searchable__, key))
+                                    .format(model, __searchable__, key))
 
                     attrs[primary_field] = unicode(getattr(v, primary_field))
                     writer.update_document(**attrs)
@@ -307,9 +306,11 @@ def index_all(app):
     """
     Index all records in database.
     """
-    for name, idx in app.whoosh_indexes.items():
-        print("Indexing %s...\t\t" % name, end='')
-        model = app.whoosh_models[name]
+    all_modles = app.extensions['sqlalchemy'].db.Model._decl_class_registry.values()
+    models = [i for i in all_modles if hasattr(i, '__searchable__')]
+    idxs = [(m, whoosh_index(app, m)) for m in models]
+    for model, idx in idxs:
+        print("Indexing %s...\t\t" % model.__name__, end='')
         with idx.writer() as writer:
             primary_field = model.pure_whoosh.primary_key_name
             searchable = model.__searchable__
@@ -322,7 +323,7 @@ def index_all(app):
                     except AttributeError:
                         raise AttributeError(
                             '{0} does not have {1} field {2}'
-                            .format(model, __searchable__, key))
+                                .format(model, __searchable__, key))
                 attrs[primary_field] = unicode(getattr(v, primary_field))
                 writer.update_document(**attrs)
         print("done")
