@@ -121,6 +121,23 @@ class _QueryProxy(flask_sqlalchemy.BaseQuery):
             result_set.add(pk)
             result_ranks[unicode(pk)] = rank
 
+        if like:
+            # if True, will return whoosh search result
+            # and fuzzy search result appended behind using SQL LIKE
+            query_colums = []
+            field_names = self._whoosh_searcher._index.schema._fields.keys()
+            for clm in set(field_names) - set([self._primary_key_name]):
+                query_colums.append(getattr(self._modelclass,
+                                            clm).like(u'%{}%'.format(query)))
+            id_tuples = self.filter(sqlalchemy.or_(*query_colums)) \
+                .with_entities(self._primary_key_name).all()
+            ids = [i[0] for i in id_tuples]
+            ids = set(ids) - result_set
+            start = len(result_set)
+            for rank, pk in enumerate(ids):
+                result_set.add(pk)
+                result_ranks[unicode(pk)] = start + rank
+
         if not result_set:
             # We don't want to proceed with empty results because we get a
             # stderr warning from sqlalchemy when executing 'in_' on empty set.
