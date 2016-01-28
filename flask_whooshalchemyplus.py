@@ -87,7 +87,8 @@ class _QueryProxy(flask_sqlalchemy.BaseQuery):
 
         return _inner()
 
-    def whoosh_search(self, query, limit=None, fields=None, or_=False):
+    def whoosh_search(self, query, limit=None,
+                      fields=None, or_=False, like=False):
         '''
 
         Execute text query on database. Results have a text-based
@@ -112,7 +113,15 @@ class _QueryProxy(flask_sqlalchemy.BaseQuery):
 
         results = self._whoosh_searcher(query, limit, fields, or_)
 
-        if not results:
+        result_set = set()
+        result_ranks = {}
+
+        for rank, result in enumerate(results):
+            pk = result[self._primary_key_name]
+            result_set.add(pk)
+            result_ranks[unicode(pk)] = rank
+
+        if not result_set:
             # We don't want to proceed with empty results because we get a
             # stderr warning from sqlalchemy when executing 'in_' on empty set.
             # However we cannot just return an empty list because it will not
@@ -120,14 +129,6 @@ class _QueryProxy(flask_sqlalchemy.BaseQuery):
 
             # XXX is this efficient?
             return self.filter('null')
-
-        result_set = set()
-        result_ranks = {}
-
-        for rank, result in enumerate(results):
-            pk = result[self._primary_key_name]
-            result_set.add(pk)
-            result_ranks[pk] = rank
 
         f = self.filter(getattr(self._modelclass,
                                 self._primary_key_name).in_(result_set))
@@ -247,14 +248,16 @@ def _get_whoosh_schema_and_primary_key(model, analyzer):
                                                    (sqlalchemy.types.Text,
                                                     sqlalchemy.types.String,
                                                     sqlalchemy.types.Unicode)):
-            schema[field.name] = whoosh.fields.TEXT(analyzer=analyzer, vector=True)
+            schema[field.name] = whoosh.fields.TEXT(
+                analyzer=analyzer, vector=True)
 
     for parent_class in model.__bases__:
         if hasattr(parent_class, "_sa_class_manager"):
             if parent_class.__searchable__:
                 for i in set(parent_class.__searchable__):
                     if hasattr(parent_class, i):
-                        schema[i] = whoosh.fields.TEXT(analyzer=analyzer, vector=True)
+                        schema[i] = whoosh.fields.TEXT(
+                            analyzer=analyzer, vector=True)
 
     return Schema(**schema), primary
 
@@ -306,7 +309,8 @@ def index_all(app):
     """
     Index all records in database.
     """
-    all_modles = app.extensions['sqlalchemy'].db.Model._decl_class_registry.values()
+    all_modles = app.extensions[
+        'sqlalchemy'].db.Model._decl_class_registry.values()
     models = [i for i in all_modles if hasattr(i, '__searchable__')]
     idxs = [(m, whoosh_index(app, m)) for m in models]
     for model, idx in idxs:
