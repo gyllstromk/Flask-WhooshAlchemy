@@ -1,7 +1,7 @@
-Welcome to Flask-WhooshAlchemy!
+Welcome to Flask-WhooshAlchemyPlus!
 ===============================
 
-Flask-WhooshAlchemy is a Flask extension that integrates the text-search functionality of `Whoosh <https://bitbucket.org/mchaput/whoosh/wiki/Home>`_ with the ORM of `SQLAlchemy <http://www.sqlalchemy.org/>`_ for use in `Flask <http://flask.pocoo.org/>`_ applications.
+Flask-WhooshAlchemyPlus is a Flask extension that integrates the text-search functionality of `Whoosh <https://bitbucket.org/mchaput/whoosh/wiki/Home>`_ with the ORM of `SQLAlchemy <http://www.sqlalchemy.org/>`_ for use in `Flask <http://flask.pocoo.org/>`_ applications.
 
 Source code and issue tracking at `GitHub <https://github.com/Revolution1/Flask-WhooshAlchemyPlus>`_.
 
@@ -11,13 +11,14 @@ Install
 
 ::
 
-    pip install flask_whooshalchemyplus
+    $ pip install flask_whooshalchemyplus
 
 Or:
 
 ::
 
-    git clone https://github.com/Revolution1/Flask-WhooshAlchemyPlus.git
+    $ git clone https://github.com/Revolution1/Flask-WhooshAlchemyPlus.git
+    $ cd Flask-WhooshAlchemyPlus && python setup.py install
 
 Quickstart
 ----------
