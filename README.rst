@@ -1,5 +1,5 @@
 Welcome to Flask-WhooshAlchemyPlus!
-===============================
+===================================
 
 Flask-WhooshAlchemyPlus is a Flask extension that integrates the text-search functionality of `Whoosh <https://bitbucket.org/mchaput/whoosh/wiki/Home>`_ with the ORM of `SQLAlchemy <http://www.sqlalchemy.org/>`_ for use in `Flask <http://flask.pocoo.org/>`_ applications.
 
@@ -112,7 +112,7 @@ If you want ordinary text matching result too::
 
     results =  BlogPost.query.whoosh_search('cool', like=True)
 
-This acts like whoosh_search('cool') + SQL LIKE '%cool%'
+This acts like ``whoosh_search('cool') + SQL LIKE '%cool%'``
 
 
 pure_whoosh
@@ -142,7 +142,7 @@ CHANGELOG
 
   - Feature: Indexing child module class `github issue #43 <https://github.com/gyllstromk/Flask-WhooshAlchemy/pull/43>`_
   - Feature: Add python3 supprot
-  - Fix: Obey result sorting if caller explicitly uses order_by() on query `github pull request #32 <https://github.com/gyllstromk/Flask-WhooshAlchemy/pull/32/files>`_
-  - Fix: custom query_class usage `github pull request #35 <https://github.com/gyllstromk/Flask-WhooshAlchemy/pull/35/files>`_
+  - Fix: Obey result sorting if caller explicitly uses order_by() on query `github pull request #32 <https://github.com/gyllstromk/Flask-WhooshAlchemy/pull/32>`_
+  - Fix: custom query_class usage `github pull request #35 <https://github.com/gyllstromk/Flask-WhooshAlchemy/pull/35>`_
   - Feature: add ``WHOOSH_DISABLED`` option to disable whooshalchemyplus at runtime
 
