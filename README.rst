@@ -121,3 +121,28 @@ pure_whoosh
 If you want the ``whoosh.index.searcher().search()`` result::
 
     results =  BlogPost.pure_whoosh(self, query, limit=None, fields=None, or_=False)
+
+
+CHANGELOG
+---------
+
+- v0.7.4 :
+
+  - Feature: add fuzzy-searching using SQL LIKE
+
+- v0.7.3 :
+
+  - Fix: Chinese analyzer does not take affect
+
+- v0.7.2 :
+
+  - Fix: index_all cannot detect indexable models by itself
+
+- v0.7.1 :
+
+  - Feature: Indexing child module class `github issue #43 <https://github.com/gyllstromk/Flask-WhooshAlchemy/pull/43>`_
+  - Feature: Add python3 supprot
+  - Fix: Obey result sorting if caller explicitly uses order_by() on query `github pull request #32 <https://github.com/gyllstromk/Flask-WhooshAlchemy/pull/32/files>`_
+  - Fix: custom query_class usage `github pull request #35 <https://github.com/gyllstromk/Flask-WhooshAlchemy/pull/35/files>`_
+  - Feature: add ``WHOOSH_DISABLED`` option to disable whooshalchemyplus at runtime
+
