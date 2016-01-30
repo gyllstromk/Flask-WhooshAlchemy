@@ -105,3 +105,18 @@ By default, the search is executed on all of the indexed fields as an OR conjunc
 By default, results will only be returned if they contain all of the query terms (AND). To switch to an OR grouping, set the ``or_`` parameter to ``True``::
 
     results = BlogPost.query.whoosh_search('cool', or_=True)
+
+
+If you want ordinary text matching result too::
+
+    results =  BlogPost.query.whoosh_search('cool', like=True)
+
+This acts like whoosh_search('cool') + SQL LIKE '%cool%'
+
+
+pure_whoosh
+------------------
+
+If you want the ``whoosh.index.searcher().search()`` result::
+
+    results =  BlogPost.pure_whoosh(self, query, limit=None, fields=None, or_=False)

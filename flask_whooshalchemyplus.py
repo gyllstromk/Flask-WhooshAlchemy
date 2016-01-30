@@ -119,7 +119,27 @@ class _QueryProxy(flask_sqlalchemy.BaseQuery):
         for rank, result in enumerate(results):
             pk = result[self._primary_key_name]
             result_set.add(pk)
-            result_ranks[unicode(pk)] = rank
+            result_ranks[pk] = rank
+
+        length = len(result_set)
+        like_limit = limit - length if limit else None
+        if like and like_limit is not 0:
+            # if True, will return whoosh search result
+            # and fuzzy search result appended behind using SQL LIKE
+            query_colums = []
+            if fields is None:
+                fields = self._whoosh_searcher._index.schema._fields.keys()
+            for clm in set(fields) - set([self._primary_key_name]):
+                query_colums.append(getattr(self._modelclass,
+                                            clm).like(u'%{}%'.format(query)))
+            id_tuples = self.filter(sqlalchemy.or_(*query_colums)) \
+                .with_entities(self._primary_key_name).all()
+            ids = [unicode(i[0]) for i in id_tuples]
+            ids = sorted(set(ids) - result_set)
+            if ids:
+                for rank, pk in enumerate(ids[:like_limit]):
+                    result_set.add(pk)
+                    result_ranks[pk] = length + rank
 
         if not result_set:
             # We don't want to proceed with empty results because we get a
