@@ -148,7 +148,8 @@ class _QueryProxy(flask_sqlalchemy.BaseQuery):
             # be a query.
 
             # XXX is this efficient?
-            return self.filter('null')
+            #return self.filter('null')
+            return self.filter(sqlalchemy.text('null'))
 
         f = self.filter(getattr(self._modelclass,
                                 self._primary_key_name).in_(result_set))
