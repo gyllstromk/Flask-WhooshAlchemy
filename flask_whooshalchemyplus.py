@@ -11,28 +11,31 @@
 
 '''
 
-from __future__ import with_statement
 from __future__ import absolute_import
-
-
-import flask.ext.sqlalchemy as flask_sqlalchemy
-
-import sqlalchemy
-
-from whoosh.qparser import OrGroup
-from whoosh.qparser import AndGroup
-from whoosh.qparser import MultifieldParser
-from whoosh.analysis import StemmingAnalyzer
-import whoosh.index
-from whoosh.fields import Schema
-#from whoosh.fields import ID, TEXT, KEYWORD, STORED
+from __future__ import print_function
+from __future__ import with_statement
 
 import heapq
 import os
 
+import flask_sqlalchemy as flask_sqlalchemy
+import sqlalchemy
+import whoosh.index
+from whoosh.analysis import StemmingAnalyzer
+from whoosh.fields import Schema
+from whoosh.qparser import AndGroup
+from whoosh.qparser import MultifieldParser
+from whoosh.qparser import OrGroup
+from whoosh.writing import AsyncWriter
+
+try:
+    unicode
+except NameError:
+    unicode = str
+
+__version__ = '0.7.4'
 
 __searchable__ = '__searchable__'
-
 
 DEFAULT_WHOOSH_INDEX_NAME = 'whoosh_index'
 
@@ -58,21 +61,25 @@ class _QueryProxy(flask_sqlalchemy.BaseQuery):
 
         super_iter = super(_QueryProxy, self).__iter__()
 
-        if self._whoosh_rank is None:
-            # Whoosh search hasn't been run so behave as normal.
-
+        if self._whoosh_rank is None or self._order_by is not False:
+            # Whoosh search hasn't been run or caller has explicitly asked
+            # for results to be sorted, so behave as normal (no Whoosh
+            # relevance score sorting).
             return super_iter
 
         # Iterate through the values and re-order by whoosh relevance.
         ordered_by_whoosh_rank = []
 
-        for row in super_iter:
+        super_rows = list(super_iter)
+        for row in super_rows:
             # Push items onto heap, where sort value is the rank provided by
             # Whoosh
-
-            heapq.heappush(ordered_by_whoosh_rank,
-                (self._whoosh_rank[unicode(getattr(row,
-                    self._primary_key_name))], row))
+            if hasattr(row, self._primary_key_name):
+                pk = unicode(getattr(row, self._primary_key_name))
+                heapq.heappush(ordered_by_whoosh_rank,
+                               (self._whoosh_rank[pk], row))
+            else:
+                return iter(super_rows)
 
         def _inner():
             while ordered_by_whoosh_rank:
@@ -80,7 +87,8 @@ class _QueryProxy(flask_sqlalchemy.BaseQuery):
 
         return _inner()
 
-    def whoosh_search(self, query, limit=None, fields=None, or_=False):
+    def whoosh_search(self, query, limit=None,
+                      fields=None, or_=False, like=False):
         '''
 
         Execute text query on database. Results have a text-based
@@ -99,20 +107,11 @@ class _QueryProxy(flask_sqlalchemy.BaseQuery):
         parameter to ``True``.
 
         '''
-            
+
         if not isinstance(query, unicode):
             query = unicode(query)
 
         results = self._whoosh_searcher(query, limit, fields, or_)
-
-        if not results:
-            # We don't want to proceed with empty results because we get a
-            # stderr warning from sqlalchemy when executing 'in_' on empty set.
-            # However we cannot just return an empty list because it will not
-            # be a query.
-
-            # XXX is this efficient?
-            return self.filter('null')
 
         result_set = set()
         result_ranks = {}
@@ -122,8 +121,38 @@ class _QueryProxy(flask_sqlalchemy.BaseQuery):
             result_set.add(pk)
             result_ranks[pk] = rank
 
+        length = len(result_set)
+        like_limit = limit - length if limit else None
+        if like and like_limit is not 0:
+            # if True, will return whoosh search result
+            # and fuzzy search result appended behind using SQL LIKE
+            query_colums = []
+            if fields is None:
+                fields = self._whoosh_searcher._index.schema._fields.keys()
+            for clm in set(fields) - set([self._primary_key_name]):
+                query_colums.append(getattr(self._modelclass,
+                                            clm).like(u'%{}%'.format(query)))
+            id_tuples = self.filter(sqlalchemy.or_(*query_colums)) \
+                .with_entities(self._primary_key_name).all()
+            ids = [unicode(i[0]) for i in id_tuples]
+            ids = sorted(set(ids) - result_set)
+            if ids:
+                for rank, pk in enumerate(ids[:like_limit]):
+                    result_set.add(pk)
+                    result_ranks[pk] = length + rank
+
+        if not result_set:
+            # We don't want to proceed with empty results because we get a
+            # stderr warning from sqlalchemy when executing 'in_' on empty set.
+            # However we cannot just return an empty list because it will not
+            # be a query.
+
+            # XXX is this efficient?
+            #return self.filter('null')
+            return self.filter(sqlalchemy.text('null'))
+
         f = self.filter(getattr(self._modelclass,
-            self._primary_key_name).in_(result_set))
+                                self._primary_key_name).in_(result_set))
 
         f._whoosh_rank = result_ranks
 
@@ -139,7 +168,7 @@ class _Searcher(object):
         self._index = indx
         self.searcher = indx.searcher()
         self._all_fields = list(set(indx.schema._fields.keys()) -
-                set([self.primary_key_name]))
+                                set([self.primary_key_name]))
 
     def __call__(self, query, limit=None, fields=None, or_=False):
         if fields is None:
@@ -148,21 +177,26 @@ class _Searcher(object):
         group = OrGroup if or_ else AndGroup
         parser = MultifieldParser(fields, self._index.schema, group=group)
         return self._index.searcher().search(parser.parse(query),
-                limit=limit)
+                                             limit=limit)
 
 
 def whoosh_index(app, model):
-    ''' Create whoosh index for ``model``, if one does not exist. If 
+    ''' Create whoosh index for ``model``, if one does not exist. If
     the index exists it is opened and cached. '''
 
     # gets the whoosh index for this model, creating one if it does not exist.
     # A dict of model -> whoosh index is added to the ``app`` variable.
 
+    if app.config.get('WHOOSH_DISABLED') is True:
+        return
     if not hasattr(app, 'whoosh_indexes'):
         app.whoosh_indexes = {}
+    if not hasattr(app, 'whoosh_models'):
+        app.whoosh_models = {}
 
     return app.whoosh_indexes.get(model.__name__,
-                _create_index(app, model))
+                                  _create_index(app, model))
+
 
 def _get_analyzer(app, model):
     analyzer = getattr(model, '__analyzer__', None)
@@ -174,6 +208,7 @@ def _get_analyzer(app, model):
         analyzer = StemmingAnalyzer()
 
     return analyzer
+
 
 def _create_index(app, model):
     # a schema is created based on the fields of the model. Currently we only
@@ -190,7 +225,7 @@ def _create_index(app, model):
 
     # we index per model.
     wi = os.path.join(app.config.get('WHOOSH_BASE'),
-            model.__name__)
+                      model.__name__)
 
     analyzer = _get_analyzer(app, model)
     schema, primary_key = _get_whoosh_schema_and_primary_key(model, analyzer)
@@ -203,13 +238,20 @@ def _create_index(app, model):
         indx = whoosh.index.create_in(wi, schema)
 
     app.whoosh_indexes[model.__name__] = indx
-
+    app.whoosh_models[model.__name__] = model
     model.pure_whoosh = _Searcher(primary_key, indx)
     model.whoosh_primary_key = primary_key
 
     # change the query class of this model to our own
-    model.query_class = _QueryProxy
-    
+    if model.query_class is not flask_sqlalchemy.BaseQuery \
+            and model.query_class is not _QueryProxy:
+        print(model.query_class, _QueryProxy)
+        model.query_class = type(
+            'MultipliedQuery', (model.query_class, _QueryProxy), {}
+        )
+    else:
+        model.query_class = _QueryProxy
+
     return indx
 
 
@@ -224,10 +266,19 @@ def _get_whoosh_schema_and_primary_key(model, analyzer):
             primary = field.name
 
         if field.name in searchable and isinstance(field.type,
-                (sqlalchemy.types.Text, sqlalchemy.types.String,
-                    sqlalchemy.types.Unicode)):
+                                                   (sqlalchemy.types.Text,
+                                                    sqlalchemy.types.String,
+                                                    sqlalchemy.types.Unicode)):
+            schema[field.name] = whoosh.fields.TEXT(
+                analyzer=analyzer, vector=True)
 
-            schema[field.name] = whoosh.fields.TEXT(analyzer=analyzer)
+    for parent_class in model.__bases__:
+        if hasattr(parent_class, "_sa_class_manager"):
+            if parent_class.__searchable__:
+                for i in set(parent_class.__searchable__):
+                    if hasattr(parent_class, i):
+                        schema[i] = whoosh.fields.TEXT(
+                            analyzer=analyzer, vector=True)
 
     return Schema(**schema), primary
 
@@ -238,18 +289,19 @@ def _after_flush(app, changes):
     # we update the whoosh index for the model. If no index exists, it will be
     # created here; this could impose a penalty on the initial commit of a
     # model.
-
+    if app.config.get('WHOOSH_DISABLED') is True:
+        return
     bytype = {}  # sort changes by type so we can use per-model writer
     for change in changes:
         update = change[1] in ('update', 'insert')
 
         if hasattr(change[0].__class__, __searchable__):
-            bytype.setdefault(change[0].__class__.__name__, []).append((update,
-                change[0]))
+            bytype.setdefault(change[0].__class__.__name__, []).append(
+                (update, change[0]))
 
-    for model, values in bytype.iteritems():
+    for model, values in bytype.items():
         index = whoosh_index(app, values[0][1].__class__)
-        with index.writer() as writer:
+        with AsyncWriter(index) as writer:
             primary_field = values[0][1].pure_whoosh.primary_key_name
             searchable = values[0][1].__searchable__
 
@@ -260,14 +312,43 @@ def _after_flush(app, changes):
                         try:
                             attrs[key] = unicode(getattr(v, key))
                         except AttributeError:
-                            raise AttributeError('{0} does not have {1} field {2}'
+                            raise AttributeError(
+                                '{0} does not have {1} field {2}'
                                     .format(model, __searchable__, key))
 
                     attrs[primary_field] = unicode(getattr(v, primary_field))
                     writer.update_document(**attrs)
                 else:
-                    writer.delete_by_term(primary_field, unicode(getattr(v,
-                        primary_field)))
+                    writer.delete_by_term(
+                        primary_field, unicode(getattr(v, primary_field)))
 
 
 flask_sqlalchemy.models_committed.connect(_after_flush)
+
+
+def index_all(app):
+    """
+    Index all records in database.
+    """
+    all_modles = app.extensions[
+        'sqlalchemy'].db.Model._decl_class_registry.values()
+    models = [i for i in all_modles if hasattr(i, '__searchable__')]
+    idxs = [(m, whoosh_index(app, m)) for m in models]
+    for model, idx in idxs:
+        print("Indexing %s...\t\t" % model.__name__, end='')
+        with idx.writer() as writer:
+            primary_field = model.pure_whoosh.primary_key_name
+            searchable = model.__searchable__
+            all = model.query.all()
+            for v in all:
+                attrs = {}
+                for key in searchable:
+                    try:
+                        attrs[key] = unicode(getattr(v, key))
+                    except AttributeError:
+                        raise AttributeError(
+                            '{0} does not have {1} field {2}'
+                                .format(model, __searchable__, key))
+                attrs[primary_field] = unicode(getattr(v, primary_field))
+                writer.update_document(**attrs)
+        print("done")
