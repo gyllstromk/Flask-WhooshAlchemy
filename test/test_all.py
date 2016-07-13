@@ -85,7 +85,7 @@ class Tests(TestCase):
     def tearDown(self):
         try:
             shutil.rmtree(self.app.config['WHOOSH_BASE'])
-        except OSError, e:
+        except OSError as e:
             if e.errno != 2:  # code 2 - no such file or directory
                 raise
 
