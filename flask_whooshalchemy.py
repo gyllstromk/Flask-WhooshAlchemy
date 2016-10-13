@@ -15,7 +15,7 @@ from __future__ import with_statement
 from __future__ import absolute_import
 
 
-import flask.ext.sqlalchemy as flask_sqlalchemy
+import flask_sqlalchemy as flask_sqlalchemy
 
 import sqlalchemy
 
@@ -103,7 +103,7 @@ class _QueryProxy(flask_sqlalchemy.BaseQuery):
         parameter to ``True``.
 
         '''
-            
+
         if not isinstance(query, unicode):
             query = unicode(query)
 
@@ -156,7 +156,7 @@ class _Searcher(object):
 
 
 def whoosh_index(app, model):
-    ''' Create whoosh index for ``model``, if one does not exist. If 
+    ''' Create whoosh index for ``model``, if one does not exist. If
     the index exists it is opened and cached. '''
 
     # gets the whoosh index for this model, creating one if it does not exist.
@@ -213,7 +213,7 @@ def _create_index(app, model):
 
     # change the query class of this model to our own
     model.query_class = _QueryProxy
-    
+
     return indx
 
 
