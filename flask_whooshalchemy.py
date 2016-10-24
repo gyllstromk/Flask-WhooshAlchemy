@@ -14,6 +14,7 @@
 from __future__ import with_statement
 from __future__ import absolute_import
 
+from collections import defaultdict
 
 import flask_sqlalchemy as flask_sqlalchemy
 
@@ -243,35 +244,35 @@ def _after_flush(app, changes):
     # created here; this could impose a penalty on the initial commit of a
     # model.
 
-    bytype = {}  # sort changes by type so we can use per-model writer
-    for change in changes:
-        update = change[1] in ('update', 'insert')
+    bytype = defaultdict(list)  # sort changes by type so we can use per-model writer
 
-        if hasattr(change[0].__class__, __searchable__):
-            bytype.setdefault(change[0].__class__.__name__, []).append((update,
-                change[0]))
+    for instance, change in changes:
+        update = change in ('update', 'insert')
+
+        if hasattr(instance.__class__, __searchable__):
+            bytype[instance.__class__].append((update, instance))
 
     for model, values in bytype.items():
-        index = whoosh_index(app, values[0][1].__class__)
-        with index.writer() as writer:
-            primary_field = values[0][1].pure_whoosh.primary_key_name
-            searchable = values[0][1].__searchable__
+        index = whoosh_index(app, model)
+        primary_field = model.pure_whoosh.primary_key_name
+        searchable = model.__searchable__
 
-            for update, v in values:
+        with index.writer() as writer:
+            for update, instance in values:
+                primary_key = unicode(getattr(instance, primary_field))
                 if update:
                     attrs = {}
                     for key in searchable:
                         try:
-                            attrs[key] = unicode(getattr(v, key))
+                            attrs[key] = unicode(getattr(instance, key))
                         except AttributeError:
                             raise AttributeError('{0} does not have {1} field {2}'
                                     .format(model, __searchable__, key))
 
-                    attrs[primary_field] = unicode(getattr(v, primary_field))
+                    attrs[primary_field] = primary_key
                     writer.update_document(**attrs)
                 else:
-                    writer.delete_by_term(primary_field, unicode(getattr(v,
-                        primary_field)))
+                    writer.delete_by_term(primary_field, primary_key)
 
 
 flask_sqlalchemy.models_committed.connect(_after_flush)
