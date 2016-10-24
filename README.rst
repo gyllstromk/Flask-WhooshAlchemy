@@ -28,7 +28,7 @@ Let's set up the environment and create our model:
 ::
 
     from whoosh.analysis import StemmingAnalyzer
-    import flask.ext.whooshalchemy
+    import flask_whooshalchemy
 
     # set the location for the whoosh index
     app.config['WHOOSH_BASE'] = 'path/to/whoosh/base'

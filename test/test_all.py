@@ -14,9 +14,9 @@
 from __future__ import absolute_import
 
 from flask import Flask
-from flask.ext.sqlalchemy import SQLAlchemy
-from flask.ext.testing import TestCase
-import flask.ext.whooshalchemy as wa
+from flask_sqlalchemy import SQLAlchemy
+from flask_testing import TestCase
+import flask_whooshalchemy as wa
 from whoosh.analysis import StemmingAnalyzer, DoubleMetaphoneFilter
 
 import datetime
