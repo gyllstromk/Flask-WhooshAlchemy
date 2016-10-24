@@ -30,6 +30,10 @@ Let's set up the environment and create our model:
     # set the location for the whoosh index
     app.config['WHOOSH_BASE'] = 'path/to/whoosh/base'
 
+    # enable modification tracking
+    # This is needed, otherwise DB updates are not reflected in the search index.
+    app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = True
+
 
     class BlogPost(db.Model):
       __tablename__ = 'blogpost'
