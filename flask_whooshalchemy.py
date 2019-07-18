@@ -75,7 +75,7 @@ class _QueryProxy(flask_sqlalchemy.BaseQuery):
             # Whoosh
 
             heapq.heappush(ordered_by_whoosh_rank,
-                (self._whoosh_rank[unicode(getattr(row,
+                (self._whoosh_rank[str(getattr(row,
                     self._primary_key_name))], row))
 
         def _inner():
@@ -104,8 +104,8 @@ class _QueryProxy(flask_sqlalchemy.BaseQuery):
 
         '''
 
-        if not isinstance(query, unicode):
-            query = unicode(query)
+        if not isinstance(query, str):
+            query = str(query)
 
         results = self._whoosh_searcher(query, limit, fields, or_)
 
@@ -262,15 +262,15 @@ def _after_flush(app, changes):
                     attrs = {}
                     for key in searchable:
                         try:
-                            attrs[key] = unicode(getattr(v, key))
+                            attrs[key] = str(getattr(v, key))
                         except AttributeError:
                             raise AttributeError('{0} does not have {1} field {2}'
                                     .format(model, __searchable__, key))
 
-                    attrs[primary_field] = unicode(getattr(v, primary_field))
+                    attrs[primary_field] = str(getattr(v, primary_field))
                     writer.update_document(**attrs)
                 else:
-                    writer.delete_by_term(primary_field, unicode(getattr(v,
+                    writer.delete_by_term(primary_field, str(getattr(v,
                         primary_field)))
 
 
