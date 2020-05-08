@@ -13,3 +13,5 @@ env
 include
 lib
 src
+/.idea
+/.eggs
